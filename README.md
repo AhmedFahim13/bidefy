@@ -1,5 +1,7 @@
 # Bidefy
 
+Live site: https://bidefy.vercel.app
+
 Tender intelligence for Bangladesh's public e-GP procurement portal.
 
 - Design spec: `docs/superpowers/specs/2026-09-13-bidefy-design.md`
@@ -30,4 +32,13 @@ cd worker && npm install && npm test && npm run typecheck
 npm run schema:remote          # once
 npx wrangler deploy
 cd .. && uv run python -m bidefy.export.d1 --max-rows 90000   # nightly-sized load
+```
+
+## Web app
+
+Next.js on Vercel, in `web/`. Server-rendered from the Worker API with short revalidation.
+
+```bash
+cd web && npm install && npm test && npm run build
+npx vercel --prod --yes     # deploy; NEXT_PUBLIC_API_BASE is set on the Vercel project
 ```

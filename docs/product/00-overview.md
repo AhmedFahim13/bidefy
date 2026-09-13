@@ -1,5 +1,7 @@
 # Overview
 
+Live: https://bidefy.vercel.app. API: https://bidefy.iba-jobs.workers.dev/api/v1/health.
+
 Bidefy is tender intelligence for Bangladesh's public procurement portal, e-GP. It indexes every public tender notice and contract award, resolves the messy names of bidders and procuring entities into stable identities, predicts the likely award value of a live tender, flags unusual award patterns with the numbers behind them, and sends web push alerts when a tender matching a subscriber's filters appears.
 
 ## The gap it fills

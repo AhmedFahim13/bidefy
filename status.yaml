@@ -29,8 +29,9 @@ phases:
   - id: w3
     name: "Week 3: site pages, PWA, push"
     tasks:
-      - {id: w3-pages, title: "Live tenders, tender, alerts pages", owner: claude, state: todo, weight: 4}
-      - {id: w3-pwa, title: "PWA manifest, service worker, push subscriptions", owner: claude, state: todo, weight: 3}
+      - {id: w3-pages, title: "Live tenders, tender, bidder, entity and alerts pages", owner: claude, state: done, weight: 4}
+      - {id: w3-pwa, title: "PWA manifest, service worker, push subscriptions", owner: claude, state: done, weight: 3}
+      - {id: w3-vercel, title: "Site live on Vercel", owner: claude, state: done, weight: 1, note: "https://bidefy.vercel.app"}
   - id: w4
     name: "Week 4: classifier, alert cron, public launch"
     tasks:

@@ -42,6 +42,28 @@ def test_corrigendum_rows_have_empty_status_and_a_note(tenders_html):
     assert sum(1 for r in rows if r["status"] == "Live") == 196
 
 
+def _tender_row_html(tender_id: str, status_line: str) -> str:
+    return (
+        "<tr class='bgColor-white'>"
+        "<td class=\"t-align-center\">1</td>"
+        f"<td class=\"t-align-center\">{tender_id},<br/>REF,<br/>{status_line}</td>"
+        f"<td class=\"t-align-left\">Goods,<br/><input type=\"hidden\" name=\"id\" value=\"{tender_id}\" />Title</td>"
+        "<td class=\"t-align-left\">Org</td>"
+        "<td class=\"t-align-center\">NCT,<br/>OTM</td>"
+        "<td class=\"t-align-center\">13-Sep-2026 11:00,<br/>28-Sep-2026 13:00</td>"
+        "</tr>"
+        "<input type=\"hidden\" id=\"totalPages\" value=\"1\">"
+    )
+
+
+@pytest.mark.parametrize("status_line", ["Being processed", "Contract Awarded", "To be Re-Tendered"])
+def test_parse_tender_rows_accepts_status_not_in_fixture(status_line):
+    html = _tender_row_html("123", status_line)
+    rows, _ = parse.parse_tender_rows(html)
+    assert rows[0]["status"] == status_line
+    assert rows[0]["note"] == ""
+
+
 def test_tender_ids_unique(tenders_html):
     rows, _ = parse.parse_tender_rows(tenders_html)
     ids = [r["tender_id"] for r in rows]

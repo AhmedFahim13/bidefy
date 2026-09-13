@@ -8,7 +8,13 @@ from html.parser import HTMLParser
 _DATE_RE = re.compile(r"(\d{2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2})")
 _ID_MARK = "\x00id="
 
-STATUS_WORDS = {"Live", "Cancelled", "Closed", "Awarded", "Withdrawn", "Rejected", "Re-Tendered", "Evaluation", "Contract Signed"}
+STATUS_WORDS = {
+    "Live", "Cancelled", "Closed", "Awarded", "Withdrawn", "Rejected", "Re-Tendered",
+    "Evaluation", "Contract Signed", "Being processed", "Contract Awarded", "To be Re-Tendered",
+}
+"""Documents status values seen so far. Not used to gate parsing; see NOTE_RE."""
+
+NOTE_RE = re.compile(r"Corrigendum|Amendment", re.I)
 
 
 class _RowParser(HTMLParser):
@@ -98,13 +104,13 @@ def parse_tender_rows(html: str) -> tuple[list[dict], int]:
         dates = _DATE_RE.findall(c_dates)
         tender_id = _marker_id(c_title) or (id_lines[0] if id_lines else "")
         last_id_line = id_lines[-1] if len(id_lines) > 2 else ""
-        is_status = last_id_line in STATUS_WORDS
+        is_note = bool(last_id_line) and bool(NOTE_RE.search(last_id_line))
         rows.append(
             {
                 "tender_id": tender_id,
                 "reference": id_lines[1] if len(id_lines) > 1 else "",
-                "status": last_id_line if is_status else "",
-                "note": "" if is_status else last_id_line,
+                "status": "" if is_note else last_id_line,
+                "note": last_id_line if is_note else "",
                 "nature": title_lines[0] if title_lines else "",
                 "title": " ".join(title_lines[1:]) if len(title_lines) > 1 else "",
                 "ministry": org_lines[0] if org_lines else "",

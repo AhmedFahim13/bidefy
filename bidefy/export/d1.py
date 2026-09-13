@@ -22,6 +22,7 @@ TABLES = {
                   "method", "district", "signed_on", "awardee", "bidder_id", "value_crore", "fetched_at"],
     "bidders": ["bidder_id", "canonical_name", "variants", "n_awards", "total_value_crore", "first_award", "last_award"],
     "procuring_entities": ["pe_id", "name", "ministry", "n_contracts", "n_tenders"],
+    "predictions": ["tender_id", "q10_lakh", "q50_lakh", "q90_lakh", "deferred", "model_version"],
 }
 
 
@@ -114,7 +115,7 @@ def plan_load(root: Path, watermark: Watermark, max_rows: int = DEFAULT_MAX_ROWS
         budget -= take.height
         setattr(plan.watermark, table, str(take["fetched_at"][-1]))
 
-    for table in ("bidders", "procuring_entities"):
+    for table in ("bidders", "procuring_entities", "predictions"):
         df = _read(root, table)
         if df.is_empty() or budget <= 0:
             continue

@@ -77,6 +77,8 @@ jobs:
         run: |
           uv run python -m bidefy.models.classifier train
           uv run python -m bidefy.normalize.build
+          uv run python -m bidefy.models.award train
+          uv run python -m bidefy.models.award apply
       - uses: actions/setup-node@v4
         with:
           node-version: 22

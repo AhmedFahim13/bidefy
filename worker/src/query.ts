@@ -41,6 +41,10 @@ export function tenderByIdQuery(id: string): Query {
   };
 }
 
+export function predictionQuery(id: string): Query {
+  return { sql: "SELECT q10_lakh, q50_lakh, q90_lakh, deferred, model_version FROM predictions WHERE tender_id = ?", params: [id] };
+}
+
 export function similarAwardsQuery(peId: string): Query {
   return {
     sql: "SELECT tender_id, title, awardee, bidder_id, value_crore, signed_on FROM contracts WHERE pe_id = ? ORDER BY signed_on DESC LIMIT 10",

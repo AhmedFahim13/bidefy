@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import {
-  bidderAwardsQuery, bidderQuery, parseTenderFilters, peQuery, peTopBiddersQuery,
+  bidderAwardsQuery, bidderQuery, parseTenderFilters, peQuery, peTopBiddersQuery, predictionQuery,
   similarAwardsQuery, tenderByIdQuery, tenderListQuery,
 } from "./query";
 import { newSubscriptionId, validateSubscription } from "./subscriptions";
 import { runAlerts } from "./alerts";
+import { hashIp, validateAccessRequest } from "./access";
 
 type Bindings = {
   DB: D1Database;
@@ -51,8 +52,12 @@ app.get("/api/v1/tenders/:id", async (c) => {
   const tender = await c.env.DB.prepare(q.sql).bind(...q.params).first<Record<string, unknown>>();
   if (!tender) return c.json({ error: "not found" }, 404);
   const s = similarAwardsQuery(String(tender.pe_id ?? ""));
-  const { results } = await c.env.DB.prepare(s.sql).bind(...s.params).all();
-  return c.json({ tender, similar_awards: results ?? [] });
+  const p = predictionQuery(id);
+  const [similar, prediction] = await c.env.DB.batch([
+    c.env.DB.prepare(s.sql).bind(...s.params),
+    c.env.DB.prepare(p.sql).bind(...p.params),
+  ]);
+  return c.json({ tender, similar_awards: similar.results ?? [], prediction: prediction.results?.[0] ?? null });
 });
 
 app.get("/api/v1/bidders/:id", async (c) => {
@@ -135,6 +140,40 @@ app.post("/api/v1/subscriptions", async (c) => {
 app.delete("/api/v1/subscriptions/:id", async (c) => {
   const { meta } = await c.env.DB.prepare("DELETE FROM subscriptions WHERE id = ?").bind(c.req.param("id")).run();
   return c.json({ deleted: meta.changes ?? 0 });
+});
+
+app.post("/api/v1/access-requests", async (c) => {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid json" }, 400);
+  }
+  const v = validateAccessRequest(body);
+  if (!v.ok) return c.json({ error: v.error }, 400);
+  const ip = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? "unknown";
+  const ipHash = await hashIp(ip);
+  const hourAgo = new Date(Date.now() - 3600_000).toISOString();
+  const recent = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM access_requests WHERE ip_hash = ? AND created_at > ?")
+    .bind(ipHash, hourAgo)
+    .first<{ n: number }>();
+  if ((recent?.n ?? 0) >= 5) return c.json({ error: "too many requests from this network, try later" }, 429);
+  const id = newSubscriptionId();
+  await c.env.DB.prepare(
+    "INSERT INTO access_requests (id, created_at, name, organisation, role, bids_on, value_band, contact, note, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  )
+    .bind(id, new Date().toISOString(), v.value.name, v.value.organisation, v.value.role, v.value.bids_on, v.value.value_band, v.value.contact, v.value.note, ipHash)
+    .run();
+  return c.json({ id }, 201);
+});
+
+app.get("/api/v1/admin/access-requests", async (c) => {
+  const token = c.req.header("x-admin-token") ?? "";
+  if (!c.env.ADMIN_TOKEN || token !== c.env.ADMIN_TOKEN) return c.json({ error: "forbidden" }, 403);
+  const { results } = await c.env.DB.prepare(
+    "SELECT id, created_at, name, organisation, role, bids_on, value_band, contact, note FROM access_requests ORDER BY created_at DESC LIMIT 200",
+  ).all();
+  return c.json({ items: results ?? [] });
 });
 
 app.post("/api/v1/admin/run-alerts", async (c) => {

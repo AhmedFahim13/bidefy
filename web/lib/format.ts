@@ -14,6 +14,11 @@ export function formatCrore(v: number | null | undefined): string {
   return `${(v * 100).toFixed(1).replace(/\.?0+$/, "")} lakh`;
 }
 
+export function formatLakh(v: number | null | undefined): string {
+  if (v === null || v === undefined || Number.isNaN(v)) return "";
+  return formatCrore(v / 100);
+}
+
 export function parseFetchedAt(stamp: string | null | undefined): Date | null {
   const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/.exec(stamp ?? "");
   if (!m) return null;

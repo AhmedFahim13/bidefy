@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { api } from "@/lib/api";
-import { formatCrore, formatDate } from "@/lib/format";
+import { formatCrore, formatDate, formatLakh } from "@/lib/format";
 import { CategoryChip, ClosingBadge, StatusPill } from "../../components/TenderCard";
 
 type Props = { params: Promise<{ id: string }> };
@@ -65,7 +65,19 @@ export default async function TenderPage({ params }: Props) {
       <aside>
         <div className="border-t-2 border-ink pt-3">
           <p className="eyebrow">Predicted award band</p>
-          <p className="mt-2 text-sm text-ink-3">Arrives with the award model in week 5. It will show an interval with a deferral rate, not a point.</p>
+          {data.prediction && !data.prediction.deferred ? (
+            <div className="mt-2">
+              <p className="num text-2xl font-medium">{formatLakh(data.prediction.q10_lakh)} to {formatLakh(data.prediction.q90_lakh)}</p>
+              <p className="mt-1 text-sm text-ink-2">Most likely near <span className="num">{formatLakh(data.prediction.q50_lakh)}</span>.</p>
+              <p className="mt-2 text-xs text-ink-3">
+                An 80 percent band from this entity's award history, the ministry, method and category. Calibrated on held-out awards, so about four in five real awards land inside bands like this one. Model {data.prediction.model_version}.
+              </p>
+            </div>
+          ) : data.prediction ? (
+            <p className="mt-2 text-sm text-ink-3">No band for this tender. The entity has too little award history, or the band would be too wide to be useful. Bidefy declines rather than guesses.</p>
+          ) : (
+            <p className="mt-2 text-sm text-ink-3">No band yet. Bands appear for live tenders once the award model has run against this entity's history.</p>
+          )}
         </div>
         <div className="mt-8 border-t-2 border-ink pt-3">
           <p className="eyebrow">Recent awards by this entity</p>

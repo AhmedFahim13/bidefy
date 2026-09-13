@@ -43,6 +43,7 @@ export type Bidder = {
   first_award: string | null;
   last_award: string | null;
 };
+export type Prediction = { q10_lakh: number; q50_lakh: number; q90_lakh: number; deferred: number | boolean; model_version: string };
 export type PE = { pe_id: string; name: string; ministry: string; n_contracts: number; n_tenders: number };
 export type TopBidder = { bidder_id: string; awardee: string; n_awards: number; total_value_crore: number };
 export type Stats = {
@@ -69,7 +70,7 @@ export const api = {
   stats: () => get<Stats>("/api/v1/stats", 120),
   filters: () => get<Filters>("/api/v1/filters", 3600),
   tenders: (qs: string) => get<{ page: number; size: number; items: Tender[] }>(`/api/v1/tenders${qs ? "?" + qs : ""}`, 120),
-  tender: (id: string) => get<{ tender: Tender; similar_awards: Award[] }>(`/api/v1/tenders/${encodeURIComponent(id)}`),
+  tender: (id: string) => get<{ tender: Tender; similar_awards: Award[]; prediction: Prediction | null }>(`/api/v1/tenders/${encodeURIComponent(id)}`),
   bidder: (id: string) => get<{ bidder: Bidder; awards: Award[] }>(`/api/v1/bidders/${encodeURIComponent(id)}`),
   pe: (id: string) => get<{ procuring_entity: PE; top_bidders: TopBidder[] }>(`/api/v1/pe/${encodeURIComponent(id)}`),
 };

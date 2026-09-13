@@ -26,6 +26,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
           <p className="mt-3 max-w-xl text-ink-2">
             Bidefy indexes the e-GP portal nightly, resolves the firms behind the awards, and alerts you when a tender matching your filters appears. Free for the alerts; intelligence on top.
           </p>
+          <p className="mt-3 text-sm">
+            <a href="/alerts" className="text-brand">Set up alerts</a>
+            <span className="text-ink-3"> · </span>
+            <a href="/access" className="text-brand">Request access to Pro</a>
+          </p>
         </div>
         <div className="grid grid-cols-3 gap-4">
           <Stat label="Live tenders" value={stats?.live_tenders ?? 0} />

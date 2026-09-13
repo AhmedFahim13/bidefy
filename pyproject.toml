@@ -10,6 +10,8 @@ dependencies = [
     "markdown>=3.5",
     "scikit-learn>=1.4",
     "joblib>=1.6.0",
+    "lightgbm>=4.7.0",
+    "pandas>=3.0.5",
 ]
 
 [dependency-groups]

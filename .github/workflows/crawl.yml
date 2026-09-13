@@ -1,0 +1,57 @@
+name: Crawl e-GP
+
+on:
+  schedule:
+    - cron: "0 20 * * *"        # 02:00 Dhaka
+  workflow_dispatch:
+    inputs:
+      endpoint:
+        description: tenders or contracts
+        default: tenders
+      mode:
+        description: backfill or delta
+        default: backfill
+      budget_min:
+        description: minutes before the run checkpoints and exits
+        default: "300"
+
+concurrency:
+  group: crawl
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync
+      - name: Decide mode for scheduled runs
+        id: mode
+        run: |
+          EP="${{ github.event.inputs.endpoint || 'tenders' }}"
+          MODE="${{ github.event.inputs.mode || '' }}"
+          if [ -z "$MODE" ]; then
+            if [ -f "checkpoints/$EP.json" ] && python -c "import json,sys;c=json.load(open('checkpoints/$EP.json'));sys.exit(0 if c['total_pages'] and c['next_page']>c['total_pages'] else 1)"; then
+              MODE=delta
+            else
+              MODE=backfill
+            fi
+          fi
+          echo "endpoint=$EP" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+      - name: Crawl
+        run: uv run python -m bidefy.crawler.run --endpoint "${{ steps.mode.outputs.endpoint }}" --mode "${{ steps.mode.outputs.mode }}" --budget-min "${{ github.event.inputs.budget_min || '300' }}"
+      - name: Commit data
+        run: |
+          git config user.name "bidefy-bot"
+          git config user.email "bidefy-bot@users.noreply.github.com"
+          git add data checkpoints
+          if git diff --cached --quiet; then echo "nothing to commit"; exit 0; fi
+          git commit -m "data: ${{ steps.mode.outputs.endpoint }} ${{ steps.mode.outputs.mode }} $(date -u +%Y-%m-%dT%H:%MZ)"
+          git pull --rebase
+          git push

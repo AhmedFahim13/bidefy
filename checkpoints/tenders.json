@@ -1,0 +1,11 @@
+{
+  "endpoint": "tenders",
+  "next_page": 48,
+  "total_pages": 3129,
+  "newest_id_seen": "",
+  "mode": "backfill",
+  "updated_at": "2026-09-13T07:02:38Z",
+  "last_run_pages": 47,
+  "last_run_rows": 9399,
+  "last_run_status": "budget"
+}

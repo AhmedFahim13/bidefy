@@ -74,3 +74,26 @@ def test_contract_value_parse():
     assert parse.parse_value_crore("0.137") == 0.137
     assert parse.parse_value_crore("2,433.5") == 2433.5
     assert parse.parse_value_crore("abc") is None
+
+
+@pytest.fixture(scope="module")
+def detail_html() -> str:
+    return (FIX / "detail_page.html").read_text(encoding="utf-8")
+
+
+def test_parse_detail_fields(detail_html):
+    d = parse.parse_detail(detail_html)
+    assert d["tender_id"].isdigit()
+    assert d["procuring_entity"]
+    assert d["procuring_entity_district"]
+    assert d["method"]
+    assert isinstance(d["categories"], list) and d["categories"]
+    assert d["security_bdt"] is None or d["security_bdt"] >= 0
+    assert d["published_at"] and "T" in d["published_at"]
+    assert isinstance(d["document_price_bdt"], (int, type(None)))
+
+
+def test_parse_detail_empty():
+    d = parse.parse_detail("<html><body>Session Expired</body></html>")
+    assert d["tender_id"] == ""
+    assert d["categories"] == []

@@ -177,3 +177,69 @@ def parse_contract_rows(html: str) -> tuple[list[dict], int]:
         )
     total = int(p.hidden.get("totalPages", "0") or 0)
     return rows, total
+
+
+def _label_map(rows: list[list[str]]) -> dict[str, str]:
+    """Pairs 'Label :' cells with the cell to their right, across all rows.
+
+    A label often spans several <br>-separated lines within one cell (e.g.
+    "Tender/Proposal    Closing\nDate and Time :"), so the key is built by
+    collapsing all whitespace, including embedded newlines, to single spaces.
+    """
+    out: dict[str, str] = {}
+    for cells in rows:
+        for i in range(len(cells) - 1):
+            label = cells[i].strip()
+            if label.endswith(":"):
+                key = re.sub(r"\s+", " ", label.rstrip(":")).strip()
+                value = " ".join(_lines(cells[i + 1]))
+                if key and key not in out:
+                    out[key] = value
+    return out
+
+
+def _to_int(text: str | None) -> int | None:
+    digits = re.sub(r"[^\d]", "", text or "")
+    return int(digits) if digits else None
+
+
+def parse_detail(html: str) -> dict:
+    """Fields from ViewTender.jsp. Missing fields are '' or None; categories is a list."""
+    p = _parse(html)
+    m = _label_map(p.rows)
+    security = None
+    for cells in p.rows:
+        # Lot rows have six cells: lot no. (a digit, or "single" for a
+        # single-lot tender), description, entity, security amount, and two
+        # dates.
+        lot_no = cells[0].strip().lower() if cells else ""
+        if len(cells) == 6 and (lot_no.isdigit() or lot_no == "single"):
+            amount = _to_int(cells[3])
+            if amount is not None:
+                security = (security or 0) + amount
+    categories = [c.strip() for c in m.get("Category", "").split(";") if c.strip()]
+    return {
+        "tender_id": re.sub(r"\D", "", m.get("Tender/Proposal ID", "")),
+        "reference": m.get("Invitation Reference No.", ""),
+        "ministry": m.get("Ministry", ""),
+        "division": m.get("Division", ""),
+        "organization": m.get("Organization", ""),
+        "procuring_entity": m.get("Procuring Entity Name", ""),
+        "procuring_entity_district": m.get("Procuring Entity District", ""),
+        "nature": m.get("Procurement Nature", ""),
+        "procurement_type": m.get("Procurement Type", ""),
+        "method": m.get("Procurement Method", ""),
+        "budget_type": m.get("Budget Type", ""),
+        "source_of_funds": m.get("Source of Funds", ""),
+        "package": m.get("Tender/Proposal Package No. and Description", ""),
+        "categories": categories,
+        "published_at": parse_datetime(
+            m.get("Scheduled Tender/Proposal Publication Date and Time", "")
+        ),
+        "closing_at": parse_datetime(
+            m.get("Tender/Proposal Closing Date and Time", "")
+        ),
+        "document_price_bdt": _to_int(m.get("Tender/Proposal Document Price (In BDT)")),
+        "security_bdt": security,
+        "brief": m.get("Brief Description of Goods and Related Service", "") or m.get("Brief Description of Works", "") or m.get("Brief Description of Services", ""),
+    }

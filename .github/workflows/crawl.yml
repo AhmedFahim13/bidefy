@@ -27,6 +27,11 @@ jobs:
   crawl:
     runs-on: ubuntu-latest
     timeout-minutes: 350
+    env:
+      INPUT_ENDPOINT: ${{ github.event.inputs.endpoint }}
+      INPUT_MODE: ${{ github.event.inputs.mode }}
+      INPUT_BUDGET: ${{ github.event.inputs.budget_min }}
+      EVENT_SCHEDULE: ${{ github.event.schedule }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
@@ -34,17 +39,25 @@ jobs:
       - name: Decide mode for scheduled runs
         id: mode
         run: |
-          EP="${{ github.event.inputs.endpoint }}"
+          EP="$INPUT_ENDPOINT"
           if [ -z "$EP" ]; then
-            if [ "${{ github.event.schedule }}" = "0 8 * * *" ]; then
+            if [ "$EVENT_SCHEDULE" = "0 8 * * *" ]; then
               EP=contracts
             else
               EP=tenders
             fi
           fi
-          MODE="${{ github.event.inputs.mode || '' }}"
+          if [ "$EP" != "tenders" ] && [ "$EP" != "contracts" ]; then
+            echo "invalid endpoint: $EP" >&2
+            exit 1
+          fi
+          MODE="$INPUT_MODE"
+          if [ -n "$MODE" ] && [ "$MODE" != "backfill" ] && [ "$MODE" != "delta" ]; then
+            echo "invalid mode: $MODE" >&2
+            exit 1
+          fi
           if [ -z "$MODE" ]; then
-            if [ -f "checkpoints/$EP.json" ] && python3 -c "import json,sys;c=json.load(open('checkpoints/$EP.json'));sys.exit(0 if c['total_pages'] and c['next_page']>c['total_pages'] else 1)"; then
+            if [ -f "checkpoints/$EP.json" ] && EP="$EP" python3 -c "import json,os,sys;c=json.load(open('checkpoints/'+os.environ['EP']+'.json'));sys.exit(0 if c['total_pages'] and c['next_page']>c['total_pages'] else 1)"; then
               MODE=delta
             else
               MODE=backfill
@@ -53,7 +66,7 @@ jobs:
           echo "endpoint=$EP" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
       - name: Crawl
-        run: uv run python -m bidefy.crawler.run --endpoint "${{ steps.mode.outputs.endpoint }}" --mode "${{ steps.mode.outputs.mode }}" --budget-min "${{ github.event.inputs.budget_min || '300' }}"
+        run: uv run python -m bidefy.crawler.run --endpoint "${{ steps.mode.outputs.endpoint }}" --mode "${{ steps.mode.outputs.mode }}" --budget-min "${INPUT_BUDGET:-300}"
       - name: Compact
         env:
           EP: ${{ steps.mode.outputs.endpoint }}

@@ -7,3 +7,5 @@ review/*.tmp
 build/
 worker/node_modules/
 worker/.wrangler/
+worker/.dev.vars
+worker/.vapid.json

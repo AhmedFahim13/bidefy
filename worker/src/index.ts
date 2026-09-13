@@ -4,11 +4,12 @@ import {
   bidderAwardsQuery, bidderQuery, parseTenderFilters, peQuery, peTopBiddersQuery,
   similarAwardsQuery, tenderByIdQuery, tenderListQuery,
 } from "./query";
+import { newSubscriptionId, validateSubscription } from "./subscriptions";
 
-type Bindings = { DB: D1Database };
+type Bindings = { DB: D1Database; VAPID_PUBLIC_KEY: string; VAPID_SUBJECT: string };
 const app = new Hono<{ Bindings: Bindings }>();
 
-app.use("/api/*", cors({ origin: "*", allowMethods: ["GET", "OPTIONS"] }));
+app.use("/api/*", cors({ origin: "*", allowMethods: ["GET", "POST", "DELETE", "OPTIONS"] }));
 
 app.get("/", (c) => c.json({ name: "Bidefy API", docs: "/api/v1/health" }));
 
@@ -64,6 +65,62 @@ app.get("/api/v1/pe/:id", async (c) => {
   const t = peTopBiddersQuery(id);
   const { results } = await c.env.DB.prepare(t.sql).bind(...t.params).all();
   return c.json({ procuring_entity: pe, top_bidders: results ?? [] });
+});
+
+app.get("/api/v1/filters", async (c) => {
+  const [ministries, districts, statuses] = await c.env.DB.batch([
+    c.env.DB.prepare("SELECT ministry AS v, COUNT(*) AS n FROM tenders WHERE ministry != '' GROUP BY ministry ORDER BY n DESC LIMIT 60"),
+    c.env.DB.prepare("SELECT district AS v, COUNT(*) AS n FROM contracts WHERE district != '' GROUP BY district ORDER BY n DESC LIMIT 70"),
+    c.env.DB.prepare("SELECT status AS v, COUNT(*) AS n FROM tenders WHERE status != '' GROUP BY status ORDER BY n DESC"),
+  ]);
+  return c.json({ ministries: ministries.results ?? [], districts: districts.results ?? [], statuses: statuses.results ?? [] });
+});
+
+app.get("/api/v1/stats", async (c) => {
+  const r = await c.env.DB.batch([
+    c.env.DB.prepare("SELECT COUNT(*) AS n FROM tenders WHERE status = 'Live'"),
+    c.env.DB.prepare("SELECT COUNT(*) AS n FROM contracts"),
+    c.env.DB.prepare("SELECT COUNT(*) AS n FROM bidders"),
+    c.env.DB.prepare("SELECT MAX(published_at) AS v FROM tenders"),
+    c.env.DB.prepare("SELECT MAX(fetched_at) AS v FROM tenders"),
+  ]);
+  const one = (i: number) => (r[i].results?.[0] as Record<string, unknown> | undefined) ?? {};
+  return c.json({
+    live_tenders: one(0).n ?? 0,
+    contracts: one(1).n ?? 0,
+    bidders: one(2).n ?? 0,
+    newest_published: one(3).v ?? null,
+    last_fetched: one(4).v ?? null,
+  });
+});
+
+app.get("/api/v1/push/public-key", (c) => c.json({ key: c.env.VAPID_PUBLIC_KEY ?? "" }));
+
+app.post("/api/v1/subscriptions", async (c) => {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid json" }, 400);
+  }
+  const v = validateSubscription(body);
+  if (!v.ok) return c.json({ error: v.error }, 400);
+  const existing = await c.env.DB.prepare("SELECT id FROM subscriptions WHERE endpoint = ?")
+    .bind(v.value.endpoint)
+    .first<{ id: string }>();
+  const id = existing?.id ?? newSubscriptionId();
+  await c.env.DB.prepare(
+    "INSERT OR REPLACE INTO subscriptions (id, endpoint, keys_json, filters_json, created_at, last_sent_at) " +
+      "VALUES (?, ?, ?, ?, COALESCE((SELECT created_at FROM subscriptions WHERE id = ?), ?), NULL)",
+  )
+    .bind(id, v.value.endpoint, JSON.stringify(v.value.keys), JSON.stringify(v.value.filters), id, new Date().toISOString())
+    .run();
+  return c.json({ id, filters: v.value.filters }, existing ? 200 : 201);
+});
+
+app.delete("/api/v1/subscriptions/:id", async (c) => {
+  const { meta } = await c.env.DB.prepare("DELETE FROM subscriptions WHERE id = ?").bind(c.req.param("id")).run();
+  return c.json({ deleted: meta.changes ?? 0 });
 });
 
 export default {

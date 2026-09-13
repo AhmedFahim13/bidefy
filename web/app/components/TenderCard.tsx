@@ -1,6 +1,12 @@
 import Link from "next/link";
 import type { Tender } from "@/lib/api";
+import { categoryLabel } from "@/lib/categories";
 import { daysLeft, formatDate } from "@/lib/format";
+
+export function CategoryChip({ category }: { category?: string | null }) {
+  if (!category) return null;
+  return <span className="rounded-sm bg-brand-wash px-1.5 py-0.5 text-[0.7rem] text-brand">{categoryLabel(category)}</span>;
+}
 
 export function StatusPill({ status }: { status: string }) {
   const s = status || "Unknown";
@@ -26,6 +32,7 @@ export function TenderCard({ t, index = 0 }: { t: Tender; index?: number }) {
           <span className="num text-xs text-ink-3">{t.tender_id}</span>
           {t.method ? <span className="text-xs text-ink-3">{t.method}</span> : null}
           {t.nature ? <span className="text-xs text-ink-3">{t.nature}</span> : null}
+          <CategoryChip category={t.category} />
         </div>
         <h3 className="mt-1 text-lg leading-snug">
           <Link href={`/t/${t.tender_id}`} className="text-ink no-underline hover:text-brand hover:underline">{t.title || "Untitled tender"}</Link>

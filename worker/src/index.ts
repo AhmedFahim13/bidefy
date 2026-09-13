@@ -5,8 +5,16 @@ import {
   similarAwardsQuery, tenderByIdQuery, tenderListQuery,
 } from "./query";
 import { newSubscriptionId, validateSubscription } from "./subscriptions";
+import { runAlerts } from "./alerts";
 
-type Bindings = { DB: D1Database; VAPID_PUBLIC_KEY: string; VAPID_SUBJECT: string };
+type Bindings = {
+  DB: D1Database;
+  VAPID_PUBLIC_KEY: string;
+  VAPID_PRIVATE_KEY: string;
+  VAPID_SUBJECT: string;
+  ADMIN_TOKEN: string;
+  SITE_BASE: string;
+};
 const app = new Hono<{ Bindings: Bindings }>();
 
 app.use("/api/*", cors({ origin: "*", allowMethods: ["GET", "POST", "DELETE", "OPTIONS"] }));
@@ -68,12 +76,18 @@ app.get("/api/v1/pe/:id", async (c) => {
 });
 
 app.get("/api/v1/filters", async (c) => {
-  const [ministries, districts, statuses] = await c.env.DB.batch([
+  const [ministries, districts, statuses, categories] = await c.env.DB.batch([
     c.env.DB.prepare("SELECT ministry AS v, COUNT(*) AS n FROM tenders WHERE ministry != '' GROUP BY ministry ORDER BY n DESC LIMIT 60"),
     c.env.DB.prepare("SELECT district AS v, COUNT(*) AS n FROM contracts WHERE district != '' GROUP BY district ORDER BY n DESC LIMIT 70"),
     c.env.DB.prepare("SELECT status AS v, COUNT(*) AS n FROM tenders WHERE status != '' GROUP BY status ORDER BY n DESC"),
+    c.env.DB.prepare("SELECT category AS v, COUNT(*) AS n FROM tenders WHERE category IS NOT NULL AND category != '' GROUP BY category ORDER BY n DESC"),
   ]);
-  return c.json({ ministries: ministries.results ?? [], districts: districts.results ?? [], statuses: statuses.results ?? [] });
+  return c.json({
+    ministries: ministries.results ?? [],
+    districts: districts.results ?? [],
+    statuses: statuses.results ?? [],
+    categories: categories.results ?? [],
+  });
 });
 
 app.get("/api/v1/stats", async (c) => {
@@ -123,12 +137,17 @@ app.delete("/api/v1/subscriptions/:id", async (c) => {
   return c.json({ deleted: meta.changes ?? 0 });
 });
 
+app.post("/api/v1/admin/run-alerts", async (c) => {
+  const token = c.req.header("x-admin-token") ?? "";
+  if (!c.env.ADMIN_TOKEN || token !== c.env.ADMIN_TOKEN) return c.json({ error: "forbidden" }, 403);
+  const dry = new URL(c.req.url).searchParams.get("dry") === "1";
+  const result = await runAlerts(c.env, { dry, siteBase: c.env.SITE_BASE });
+  return c.json(result);
+});
+
 export default {
   fetch: app.fetch,
-  async scheduled(_event: ScheduledEvent, env: Bindings, _ctx: ExecutionContext) {
-    // Week 4 wires the alert matcher here. For now record the tick so the cron is observable.
-    await env.DB.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('last_cron', ?)")
-      .bind(new Date().toISOString())
-      .run();
+  async scheduled(_event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
+    ctx.waitUntil(runAlerts(env, { dry: false, siteBase: env.SITE_BASE }));
   },
 };

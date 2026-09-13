@@ -8,9 +8,11 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
     "schema:remote": "wrangler d1 execute bidefy --remote --file schema.sql --yes",
-    "schema:local": "wrangler d1 execute bidefy --local --file schema.sql --yes"
+    "schema:local": "wrangler d1 execute bidefy --local --file schema.sql --yes",
+    "migrate:remote": "wrangler d1 execute bidefy --remote --file migrations/0001_category_sent.sql --yes"
   },
   "dependencies": {
+    "@block65/webcrypto-web-push": "^2.0.0",
     "hono": "^4.6.0"
   },
   "devDependencies": {

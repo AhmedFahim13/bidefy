@@ -16,7 +16,8 @@ MAX_STATEMENT_BYTES = 90_000     # D1 rejects statements near 100 KB with SQLITE
 DEFAULT_MAX_ROWS = 90_000
 TABLES = {
     "tenders": ["tender_id", "reference", "status", "note", "nature", "title", "ministry", "organization",
-                "procuring_entity", "pe_id", "procurement_type", "method", "published_at", "closing_at", "fetched_at"],
+                "procuring_entity", "pe_id", "procurement_type", "method", "published_at", "closing_at", "fetched_at",
+                "category", "category_confidence"],
     "contracts": ["tender_id", "reference", "title", "advertised_at", "ministry", "procuring_entity", "pe_id",
                   "method", "district", "signed_on", "awardee", "bidder_id", "value_crore", "fetched_at"],
     "bidders": ["bidder_id", "canonical_name", "variants", "n_awards", "total_value_crore", "first_award", "last_award"],

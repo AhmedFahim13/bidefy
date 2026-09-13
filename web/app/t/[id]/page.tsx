@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { api } from "@/lib/api";
 import { formatCrore, formatDate } from "@/lib/format";
-import { ClosingBadge, StatusPill } from "../../components/TenderCard";
+import { CategoryChip, ClosingBadge, StatusPill } from "../../components/TenderCard";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -33,6 +33,7 @@ export default async function TenderPage({ params }: Props) {
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill status={t.status} />
           <span className="num text-xs text-ink-3">{t.tender_id}</span>
+          <CategoryChip category={t.category} />
           <ClosingBadge closing={t.closing_at} />
         </div>
         <h1 className="mt-3 text-3xl font-medium leading-tight sm:text-4xl">{t.title || "Untitled tender"}</h1>

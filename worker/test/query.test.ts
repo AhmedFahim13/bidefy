@@ -4,7 +4,7 @@ import { bidderQuery, parseTenderFilters, peQuery, tenderByIdQuery, tenderListQu
 describe("parseTenderFilters", () => {
   it("defaults and clamps", () => {
     const f = parseTenderFilters(new URLSearchParams(""));
-    expect(f).toEqual({ q: "", status: "Live", ministry: "", district: "", page: 1, size: 25 });
+    expect(f).toEqual({ q: "", status: "Live", ministry: "", district: "", category: "", page: 1, size: 25 });
     const g = parseTenderFilters(new URLSearchParams("status=all&page=0&size=999&q=%20printer%20"));
     expect(g.status).toBe("all");
     expect(g.page).toBe(1);
@@ -15,7 +15,7 @@ describe("parseTenderFilters", () => {
 
 describe("tenderListQuery", () => {
   it("builds a parameterised query with filters and paging", () => {
-    const { sql, params } = tenderListQuery({ q: "printer", status: "Live", ministry: "Ministry of Finance", district: "", page: 3, size: 25 });
+    const { sql, params } = tenderListQuery({ q: "printer", status: "Live", ministry: "Ministry of Finance", district: "", category: "", page: 3, size: 25 });
     expect(sql).toContain("FROM tenders");
     expect(sql).toContain("status = ?");
     expect(sql).toContain("title LIKE ?");
@@ -25,9 +25,16 @@ describe("tenderListQuery", () => {
     expect(params).toEqual(["Live", "%printer%", "Ministry of Finance", 25, 50]);
   });
   it("omits the status clause for all", () => {
-    const { sql, params } = tenderListQuery({ q: "", status: "all", ministry: "", district: "", page: 1, size: 10 });
+    const { sql, params } = tenderListQuery({ q: "", status: "all", ministry: "", district: "", category: "", page: 1, size: 10 });
     expect(sql).not.toContain("status = ?");
+    expect(sql).not.toContain("category = ?");
     expect(params).toEqual([10, 0]);
+  });
+  it("filters by category when given", () => {
+    const { sql, params } = tenderListQuery({ q: "", status: "Live", ministry: "", district: "", category: "medical", page: 1, size: 10 });
+    expect(sql).toContain("category = ?");
+    expect(params).toEqual(["Live", "medical", 10, 0]);
+    expect(parseTenderFilters(new URLSearchParams("category=medical")).category).toBe("medical");
   });
 });
 

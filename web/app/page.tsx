@@ -10,7 +10,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) 
 
 export default async function Home({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
-  const state = { q: one(sp.q).trim(), status: one(sp.status) || "Live", ministry: one(sp.ministry) };
+  const state = { q: one(sp.q).trim(), status: one(sp.status) || "Live", ministry: one(sp.ministry), category: one(sp.category) };
   const page = Math.max(1, Number.parseInt(one(sp.page) || "1", 10) || 1);
   const size = 25;
   const qs = buildQuery({ ...state, page, size });

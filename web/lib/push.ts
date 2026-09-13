@@ -1,4 +1,4 @@
-export type Filter = { q?: string; ministry?: string; status?: string; district?: string };
+export type Filter = { q?: string; ministry?: string; status?: string; district?: string; category?: string };
 export type SavedSubscription = { id: string; filters: Filter[] };
 const KEY = "bidefy.sub";
 

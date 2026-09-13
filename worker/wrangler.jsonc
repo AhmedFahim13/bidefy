@@ -11,6 +11,7 @@
   "triggers": { "crons": ["0 * * * *"] },
   "vars": {
     "VAPID_PUBLIC_KEY": "BHGpw1vrCA3dXOBlcSUasfG0jJNJKRz19cD_-Be-wSkWayslHNuGsLuJQHemDTy1-ABIdog7CnMtIMWW8kNh-38",
-    "VAPID_SUBJECT": "mailto:ahmed.fahim.official.bd@gmail.com"
+    "VAPID_SUBJECT": "mailto:ahmed.fahim.official.bd@gmail.com",
+    "SITE_BASE": "https://bidefy.vercel.app"
   }
 }

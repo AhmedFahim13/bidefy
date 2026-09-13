@@ -8,6 +8,7 @@ from pathlib import Path
 import polars as pl
 
 from ..crawler import store
+from ..models import classifier
 from . import resolve as r
 from .names import normalize_name
 
@@ -35,7 +36,19 @@ def _pe_counts(df: pl.DataFrame, count_col: str, zero_col: str) -> pl.DataFrame:
     )
 
 
-def build(data_root: Path, review_path: Path) -> dict:
+def _categorise(tenders: pl.DataFrame, models_dir: Path) -> pl.DataFrame:
+    """Add category and category_confidence when a trained model exists; otherwise leave the frame alone."""
+    bundle = classifier.load(models_dir)
+    if not bundle or "title" not in tenders.columns:
+        return tenders
+    preds = classifier.apply(tenders["title"].fill_null("").to_list(), bundle)
+    return tenders.with_columns(
+        pl.Series("category", [c for c, _ in preds], dtype=pl.Utf8),
+        pl.Series("category_confidence", [p for _, p in preds], dtype=pl.Float64),
+    )
+
+
+def build(data_root: Path, review_path: Path, models_dir: Path = Path("models")) -> dict:
     data_root = Path(data_root)
     tenders = store.load_all(data_root, "tenders")
     contracts = store.load_all(data_root, "contracts")
@@ -86,6 +99,7 @@ def build(data_root: Path, review_path: Path) -> dict:
         tenders = tenders.with_columns(
             pl.col("procuring_entity").fill_null("").map_elements(_pe_id, return_dtype=pl.Utf8).alias("pe_id")
         )
+        tenders = _categorise(tenders, Path(models_dir))
         _write(tenders, data_root, "tenders")
     frames = []
     if not tenders.is_empty():

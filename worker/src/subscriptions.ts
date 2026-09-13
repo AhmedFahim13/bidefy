@@ -1,10 +1,10 @@
-export type Filter = { q?: string; ministry?: string; status?: string; district?: string };
+export type Filter = { q?: string; ministry?: string; status?: string; district?: string; category?: string };
 export type ValidSubscription = { endpoint: string; keys: { p256dh: string; auth: string }; filters: Filter[] };
 export type Result = { ok: true; value: ValidSubscription } | { ok: false; error: string };
 
 const MAX_FILTERS = 3;
 const MAX_LEN = 120;
-const FILTER_KEYS: (keyof Filter)[] = ["q", "ministry", "status", "district"];
+const FILTER_KEYS: (keyof Filter)[] = ["q", "ministry", "status", "district", "category"];
 
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim().slice(0, MAX_LEN) : "";

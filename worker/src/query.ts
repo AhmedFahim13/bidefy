@@ -1,4 +1,4 @@
-export type TenderFilters = { q: string; status: string; ministry: string; district: string; page: number; size: number };
+export type TenderFilters = { q: string; status: string; ministry: string; district: string; category: string; page: number; size: number };
 export type Query = { sql: string; params: (string | number)[] };
 
 const MAX_SIZE = 100;
@@ -11,6 +11,7 @@ export function parseTenderFilters(sp: URLSearchParams): TenderFilters {
     status: (sp.get("status") ?? "Live").trim() || "Live",
     ministry: (sp.get("ministry") ?? "").trim(),
     district: (sp.get("district") ?? "").trim(),
+    category: (sp.get("category") ?? "").trim(),
     page,
     size,
   };
@@ -22,8 +23,9 @@ export function tenderListQuery(f: TenderFilters): Query {
   if (f.status !== "all") { where.push("status = ?"); params.push(f.status); }
   if (f.q) { where.push("title LIKE ?"); params.push(`%${f.q}%`); }
   if (f.ministry) { where.push("ministry = ?"); params.push(f.ministry); }
+  if (f.category) { where.push("category = ?"); params.push(f.category); }
   const sql =
-    "SELECT tender_id, reference, status, nature, title, ministry, organization, procuring_entity, pe_id, method, published_at, closing_at " +
+    "SELECT tender_id, reference, status, nature, title, ministry, organization, procuring_entity, pe_id, method, published_at, closing_at, category, category_confidence " +
     "FROM tenders" + (where.length ? " WHERE " + where.join(" AND ") : "") +
     " ORDER BY published_at DESC LIMIT ? OFFSET ?";
   params.push(f.size, (f.page - 1) * f.size);

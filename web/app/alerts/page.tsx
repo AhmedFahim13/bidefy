@@ -24,6 +24,7 @@ export default async function AlertsPage() {
         apiBase={API_BASE}
         ministries={(options?.ministries ?? []).map((m) => m.v)}
         statuses={(options?.statuses ?? []).map((s) => s.v)}
+        categories={(options?.categories ?? []).map((c) => c.v)}
       />
     </div>
   );

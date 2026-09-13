@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { loadSaved, pushSupported, subscribeToPush, unsubscribeFromPush, type Filter, type SavedSubscription } from "@/lib/push";
 
-type Props = { apiBase: string; ministries: string[]; statuses: string[] };
+import { categoryLabel } from "@/lib/categories";
+
+type Props = { apiBase: string; ministries: string[]; statuses: string[]; categories: string[] };
 const MAX = 3;
 const field = "w-full rounded-sm border border-rule bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:border-brand";
 
@@ -11,8 +13,8 @@ function isStandalone(): boolean {
   return typeof window !== "undefined" && (window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true);
 }
 
-export function AlertsForm({ apiBase, ministries, statuses }: Props) {
-  const [rows, setRows] = useState<Filter[]>([{ q: "", ministry: "", status: "Live" }]);
+export function AlertsForm({ apiBase, ministries, statuses, categories }: Props) {
+  const [rows, setRows] = useState<Filter[]>([{ q: "", ministry: "", status: "Live", category: "" }]);
   const [saved, setSaved] = useState<SavedSubscription | null>(null);
   const [supported, setSupported] = useState<boolean | null>(null);
   const [ios, setIos] = useState(false);
@@ -25,13 +27,13 @@ export function AlertsForm({ apiBase, ministries, statuses }: Props) {
     const s = loadSaved();
     if (s) {
       setSaved(s);
-      setRows(s.filters.map((f) => ({ q: f.q ?? "", ministry: f.ministry ?? "", status: f.status ?? "" })));
+      setRows(s.filters.map((f) => ({ q: f.q ?? "", ministry: f.ministry ?? "", status: f.status ?? "", category: f.category ?? "" })));
     }
   }, []);
 
   const update = (i: number, patch: Partial<Filter>) => setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
   const remove = (i: number) => setRows((r) => (r.length > 1 ? r.filter((_, j) => j !== i) : r));
-  const add = () => setRows((r) => (r.length < MAX ? [...r, { q: "", ministry: "", status: "Live" }] : r));
+  const add = () => setRows((r) => (r.length < MAX ? [...r, { q: "", ministry: "", status: "Live", category: "" }] : r));
 
   const enable = async () => {
     setBusy(true);
@@ -43,6 +45,7 @@ export function AlertsForm({ apiBase, ministries, statuses }: Props) {
           if (r.q?.trim()) f.q = r.q.trim();
           if (r.ministry) f.ministry = r.ministry;
           if (r.status && r.status !== "any") f.status = r.status;
+          if (r.category) f.category = r.category;
           return f;
         })
         .filter((f) => Object.keys(f).length);
@@ -87,10 +90,17 @@ export function AlertsForm({ apiBase, ministries, statuses }: Props) {
       ) : null}
       <div className="grid gap-3">
         {rows.map((r, i) => (
-          <div key={i} className="grid gap-2 rounded-sm border border-rule p-3 sm:grid-cols-[1.3fr_1fr_0.8fr_auto] sm:items-end">
+          <div key={i} className="grid gap-2 rounded-sm border border-rule p-3 sm:grid-cols-[1.2fr_1fr_1fr_0.8fr_auto] sm:items-end">
             <label className="block">
               <span className="eyebrow">Keyword</span>
               <input value={r.q ?? ""} onChange={(e) => update(i, { q: e.target.value })} placeholder="e.g. printer, bridge, vaccine" className={`${field} mt-1`} />
+            </label>
+            <label className="block">
+              <span className="eyebrow">Category</span>
+              <select value={r.category ?? ""} onChange={(e) => update(i, { category: e.target.value })} className={`${field} mt-1`}>
+                <option value="">Any category</option>
+                {categories.map((c) => <option key={c} value={c}>{categoryLabel(c)}</option>)}
+              </select>
             </label>
             <label className="block">
               <span className="eyebrow">Ministry</span>

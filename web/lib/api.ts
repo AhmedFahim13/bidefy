@@ -14,6 +14,8 @@ export type Tender = {
   procurement_type?: string;
   published_at: string | null;
   closing_at: string | null;
+  category?: string | null;
+  category_confidence?: number | null;
   note?: string;
   awardee?: string | null;
   bidder_id?: string | null;
@@ -51,7 +53,7 @@ export type Stats = {
   last_fetched: string | null;
 };
 export type Option = { v: string; n: number };
-export type Filters = { ministries: Option[]; districts: Option[]; statuses: Option[] };
+export type Filters = { ministries: Option[]; districts: Option[]; statuses: Option[]; categories?: Option[] };
 
 async function get<T>(path: string, revalidate = 300): Promise<T | null> {
   try {

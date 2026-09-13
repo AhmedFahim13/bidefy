@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,11 +31,18 @@ class Checkpoint:
     def save(self, path: Path) -> None:
         self.updated_at = _now()
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(asdict(self), indent=2) + "\n", encoding="utf-8")
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(asdict(self), indent=2) + "\n", encoding="utf-8")
+        os.replace(tmp, path)
 
     @classmethod
     def load(cls, path: Path, endpoint: str | None = None) -> "Checkpoint":
         if not path.exists():
             return cls(endpoint=endpoint or path.stem)
         data = json.loads(path.read_text(encoding="utf-8"))
-        return cls(**data)
+        cp = cls(**data)
+        if endpoint is not None and cp.endpoint != endpoint:
+            raise ValueError(
+                f"checkpoint at {path} is for endpoint {cp.endpoint!r}, not {endpoint!r}"
+            )
+        return cp

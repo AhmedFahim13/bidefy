@@ -1,6 +1,7 @@
 """Append-only Parquet store under data/raw/<endpoint>/. Dedupe happens on read."""
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 import uuid
@@ -10,6 +11,7 @@ from pathlib import Path
 import polars as pl
 
 ID_COLUMN = "tender_id"
+DEFAULT_MIN_PARTS = 20
 
 
 def _dir(root: Path, endpoint: str) -> Path:
@@ -80,23 +82,66 @@ def load_all(root: Path, endpoint: str) -> pl.DataFrame:
     return df.sort("fetched_at").unique(subset=[ID_COLUMN], keep="last").sort(ID_COLUMN)
 
 
-def compact(root: Path, endpoint: str) -> Path | None:
-    """Merge all readable parts into one file, deduped by id keeping the latest fetch.
+def _loose_parts(root: Path, endpoint: str) -> list[Path]:
+    """Part files that are not themselves the product of a previous compact."""
+    return [p for p in _parts(root, endpoint) if not p.name.endswith("-compact.parquet")]
 
-    Returns the path of the new compact part, or None if there were fewer than
-    two parts to merge. The old parts are only deleted after the compact file
-    has been fully written, so a crash mid-compact never loses data.
+
+def compact(root: Path, endpoint: str, min_parts: int = DEFAULT_MIN_PARTS) -> Path | None:
+    """Merge loose parts into one new compact file, deduped by id keeping the latest fetch.
+
+    Only part files that are not already the output of an earlier compact are
+    consumed, so a previous compact file is never rewritten. If fewer than
+    min_parts such loose parts exist, nothing is done and None is returned.
+    The old parts are only deleted after the new compact file has been fully
+    written, so a crash mid-compact never loses data.
     """
-    parts = _parts(root, endpoint)
-    if len(parts) < 2:
+    loose = _loose_parts(root, endpoint)
+    if len(loose) < min_parts:
         return None
-    df = load_all(root, endpoint)
+    frames = []
+    consumed = []
+    for p in loose:
+        try:
+            frames.append(pl.read_parquet(p))
+            consumed.append(p)
+        except Exception as e:  # noqa: BLE001 - a bad part must never break compaction
+            _warn(f"store: skipping unreadable part {p.name}: {e}")
+    if not frames:
+        return None
+    frames = [f.with_columns(pl.col(ID_COLUMN).cast(pl.Utf8)) for f in frames]
+    df = pl.concat(frames, how="diagonal_relaxed").sort("fetched_at").unique(subset=[ID_COLUMN], keep="last").sort(ID_COLUMN)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     out = _dir(root, endpoint)
     new_path = out / f"part-{stamp}-compact.parquet"
     tmp = new_path.with_suffix(".parquet.tmp")
     df.write_parquet(tmp, compression="zstd")
     os.replace(tmp, new_path)
-    for p in parts:
+    for p in consumed:
         p.unlink(missing_ok=True)
     return new_path
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Bidefy crawler store maintenance")
+    sub = ap.add_subparsers(dest="command", required=True)
+    compact_ap = sub.add_parser("compact", help="merge loose parts into one compact file")
+    compact_ap.add_argument("--endpoint", required=True)
+    compact_ap.add_argument("--data-root", default="data")
+    compact_ap.add_argument("--min-parts", type=int, default=DEFAULT_MIN_PARTS)
+    a = ap.parse_args(argv)
+
+    if a.command == "compact":
+        root = Path(a.data_root)
+        loose_count = len(_loose_parts(root, a.endpoint))
+        result = compact(root, a.endpoint, min_parts=a.min_parts)
+        if result is not None:
+            print(f"compact: {a.endpoint}: merged {loose_count} parts into {result}")
+        else:
+            print(f"compact: {a.endpoint}: {loose_count} parts, below threshold, nothing done")
+        return 0
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -77,7 +77,7 @@ def test_compact_merges_parts_keeps_latest_and_removes_old(tmp_path):
     parts_before = sorted((tmp_path / "raw" / "tenders").glob("part-*.parquet"))
     assert len(parts_before) == 3
 
-    new_path = store.compact(tmp_path, "tenders")
+    new_path = store.compact(tmp_path, "tenders", min_parts=2)
     assert new_path is not None
     assert new_path.name.endswith("-compact.parquet")
 
@@ -89,7 +89,66 @@ def test_compact_merges_parts_keeps_latest_and_removes_old(tmp_path):
     assert df.filter(pl.col("tender_id") == "1")["status"][0] == "Cancelled"
 
 
-def test_compact_returns_none_with_fewer_than_two_parts(tmp_path):
-    assert store.compact(tmp_path, "tenders") is None
+def test_compact_returns_none_below_threshold(tmp_path):
+    assert store.compact(tmp_path, "tenders", min_parts=2) is None
     store.append_rows(_rows("1"), tmp_path, "tenders")
+    assert store.compact(tmp_path, "tenders", min_parts=2) is None
+
+
+def test_compact_default_threshold_leaves_five_loose_parts_untouched(tmp_path):
+    for i in range(5):
+        store.append_rows(_rows(str(i)), tmp_path, "tenders")
     assert store.compact(tmp_path, "tenders") is None
+    parts = sorted((tmp_path / "raw" / "tenders").glob("part-*.parquet"))
+    assert len(parts) == 5
+
+
+def test_compact_leaves_existing_compact_files_untouched(tmp_path):
+    store.append_rows(_rows("a"), tmp_path, "tenders")
+    store.append_rows(_rows("b"), tmp_path, "tenders")
+    old_compact = store.compact(tmp_path, "tenders", min_parts=2)
+    assert old_compact is not None
+    old_compact_bytes = old_compact.read_bytes()
+
+    for i in range(25):
+        store.append_rows(_rows(f"n{i}"), tmp_path, "tenders")
+
+    loose_before = sorted(
+        p for p in (tmp_path / "raw" / "tenders").glob("part-*.parquet")
+        if not p.name.endswith("-compact.parquet")
+    )
+    assert len(loose_before) == 25
+
+    new_compact = store.compact(tmp_path, "tenders")
+    assert new_compact is not None
+    assert new_compact != old_compact
+
+    remaining = sorted((tmp_path / "raw" / "tenders").glob("part-*.parquet"))
+    assert old_compact in remaining
+    assert new_compact in remaining
+    loose_after = [
+        p for p in remaining
+        if not p.name.endswith("-compact.parquet")
+    ]
+    assert loose_after == []
+    assert old_compact.read_bytes() == old_compact_bytes
+
+    df = store.load_all(tmp_path, "tenders")
+    assert df.height == 27
+
+
+def test_compact_main_prints_merged_line_and_exits_zero(tmp_path, capsys):
+    store.append_rows(_rows("1"), tmp_path, "tenders")
+    store.append_rows(_rows("2"), tmp_path, "tenders")
+    rc = store.main(["compact", "--endpoint", "tenders", "--data-root", str(tmp_path), "--min-parts", "2"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "compact: tenders: merged 2 parts into" in out
+
+
+def test_compact_main_prints_below_threshold_line_and_exits_zero(tmp_path, capsys):
+    store.append_rows(_rows("1"), tmp_path, "tenders")
+    rc = store.main(["compact", "--endpoint", "tenders", "--data-root", str(tmp_path), "--min-parts", "2"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "compact: tenders: 1 parts, below threshold, nothing done" in out

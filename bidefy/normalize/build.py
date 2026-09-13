@@ -28,6 +28,42 @@ def _write(df: pl.DataFrame, root: Path, name: str) -> None:
     tmp.replace(out / f"{name}.parquet")
 
 
+RECENT_PER_BIDDER = 50
+RECENT_PER_PE = 10
+TOP_BIDDERS_PER_PE = 10
+
+
+def _json_rows(df: pl.DataFrame, cols: list[str]) -> str:
+    return json.dumps(df.select(cols).to_dicts(), ensure_ascii=False, default=str)
+
+
+def _recent_awards_by_bidder(awarded: pl.DataFrame) -> pl.DataFrame:
+    """bidder_id -> JSON list of the latest awards, newest first."""
+    cols = ["tender_id", "title", "procuring_entity", "pe_id", "district", "value_crore", "signed_on"]
+    out = []
+    for (bid,), grp in awarded.sort("signed_on", descending=True, nulls_last=True).group_by("bidder_id"):
+        out.append({"bidder_id": bid, "recent_awards": _json_rows(grp.head(RECENT_PER_BIDDER), cols)})
+    return pl.DataFrame(out, schema={"bidder_id": pl.Utf8, "recent_awards": pl.Utf8})
+
+
+def _pe_aggregates(contracts: pl.DataFrame) -> pl.DataFrame:
+    """pe_id -> JSON of the latest awards and of the top bidders by award count."""
+    cols = ["tender_id", "title", "awardee", "bidder_id", "value_crore", "signed_on"]
+    rows = []
+    for (pe,), grp in contracts.filter(pl.col("pe_id") != "").sort("signed_on", descending=True, nulls_last=True).group_by("pe_id"):
+        top = (
+            grp.filter(pl.col("bidder_id") != "")
+            .group_by("bidder_id")
+            .agg(pl.col("awardee").mode().first().alias("awardee"), pl.len().alias("n_awards"),
+                 pl.col("value_crore").fill_null(0.0).sum().alias("total_value_crore"))
+            .sort(["n_awards", "total_value_crore"], descending=[True, True])
+            .head(TOP_BIDDERS_PER_PE)
+        )
+        rows.append({"pe_id": pe, "recent_awards": _json_rows(grp.head(RECENT_PER_PE), cols),
+                     "top_bidders": _json_rows(top, ["bidder_id", "awardee", "n_awards", "total_value_crore"])})
+    return pl.DataFrame(rows, schema={"pe_id": pl.Utf8, "recent_awards": pl.Utf8, "top_bidders": pl.Utf8})
+
+
 def _pe_counts(df: pl.DataFrame, count_col: str, zero_col: str) -> pl.DataFrame:
     return (
         df.group_by("pe_id", "procuring_entity", "ministry")
@@ -89,6 +125,8 @@ def build(data_root: Path, review_path: Path, models_dir: Path = Path("models"))
         bidders = (
             meta.join(stats, on="bidder_id", how="left")
             .with_columns(pl.col("n_awards").fill_null(0), pl.col("total_value_crore").fill_null(0.0))
+            .join(_recent_awards_by_bidder(awarded), on="bidder_id", how="left")
+            .with_columns(pl.col("recent_awards").fill_null("[]"))
             .sort("n_awards", descending=True)
         )
         _write(bidders, data_root, "bidders")
@@ -118,6 +156,11 @@ def build(data_root: Path, review_path: Path, models_dir: Path = Path("models"))
         )
         .sort("n_contracts", descending=True)
     )
+    if not contracts.is_empty():
+        pes = pes.join(_pe_aggregates(contracts), on="pe_id", how="left")
+    else:
+        pes = pes.with_columns(pl.lit(None, dtype=pl.Utf8).alias("recent_awards"), pl.lit(None, dtype=pl.Utf8).alias("top_bidders"))
+    pes = pes.with_columns(pl.col("recent_awards").fill_null("[]"), pl.col("top_bidders").fill_null("[]"))
     _write(pes, data_root, "procuring_entities")
     return {
         "tenders": tenders.height, "contracts": contracts.height, "bidders": n_bidders,

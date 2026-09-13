@@ -45,33 +45,21 @@ export function predictionQuery(id: string): Query {
   return { sql: "SELECT q10_lakh, q50_lakh, q90_lakh, deferred, model_version FROM predictions WHERE tender_id = ?", params: [id] };
 }
 
-export function similarAwardsQuery(peId: string): Query {
-  return {
-    sql: "SELECT tender_id, title, awardee, bidder_id, value_crore, signed_on FROM contracts WHERE pe_id = ? ORDER BY signed_on DESC LIMIT 10",
-    params: [peId],
-  };
-}
-
 export function bidderQuery(id: string): Query {
   return { sql: "SELECT * FROM bidders WHERE bidder_id = ?", params: [id] };
-}
-
-export function bidderAwardsQuery(id: string): Query {
-  return {
-    sql: "SELECT tender_id, title, procuring_entity, pe_id, district, value_crore, signed_on FROM contracts WHERE bidder_id = ? ORDER BY signed_on DESC LIMIT 50",
-    params: [id],
-  };
 }
 
 export function peQuery(id: string): Query {
   return { sql: "SELECT * FROM procuring_entities WHERE pe_id = ?", params: [id] };
 }
 
-export function peTopBiddersQuery(id: string): Query {
-  return {
-    sql:
-      "SELECT bidder_id, awardee, COUNT(*) AS n_awards, SUM(COALESCE(value_crore, 0)) AS total_value_crore " +
-      "FROM contracts WHERE pe_id = ? AND bidder_id != '' GROUP BY bidder_id, awardee ORDER BY n_awards DESC LIMIT 10",
-    params: [id],
-  };
+/** Parse a JSON aggregate column; never throws, never returns anything but an array. */
+export function parseJsonList(value: unknown): unknown[] {
+  if (typeof value !== "string" || !value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }

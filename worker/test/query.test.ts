@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { bidderQuery, parseTenderFilters, peQuery, tenderByIdQuery, tenderListQuery } from "../src/query";
+import { bidderQuery, parseJsonList, parseTenderFilters, peQuery, tenderByIdQuery, tenderListQuery } from "../src/query";
+
+describe("parseJsonList", () => {
+  it("returns arrays for valid JSON lists and empty arrays otherwise", () => {
+    expect(parseJsonList('[{"a":1}]')).toEqual([{ a: 1 }]);
+    expect(parseJsonList("{}")).toEqual([]);
+    expect(parseJsonList("not json")).toEqual([]);
+    expect(parseJsonList(null)).toEqual([]);
+  });
+});
 
 describe("parseTenderFilters", () => {
   it("defaults and clamps", () => {

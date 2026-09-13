@@ -44,6 +44,12 @@ def test_build_writes_clean_tables_with_stable_ids(tmp_path: Path):
     assert tenders.height == 3 and "pe_id" in tenders.columns
     assert tenders.filter(pl.col("tender_id") == "1")["pe_id"][0] == faridpur["pe_id"]
     assert (tmp_path / "review" / "pairs.csv").exists()
+    import json
+    recent = json.loads(sawda["recent_awards"])
+    assert len(recent) == 2 and recent[0]["signed_on"] >= recent[1]["signed_on"] and "title" in recent[0]
+    top = json.loads(faridpur["top_bidders"])
+    assert top[0]["bidder_id"] == sawda["bidder_id"] and top[0]["n_awards"] == 2
+    assert len(json.loads(faridpur["recent_awards"])) == 3
 
 
 def test_build_is_idempotent_and_keeps_ids(tmp_path: Path):

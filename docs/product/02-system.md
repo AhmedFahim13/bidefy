@@ -35,7 +35,7 @@ Read the first two rows together: 90.6 percent of the categories Bidefy commits 
 | Budget | Value | Consequence |
 |---|---|---|
 | Portal politeness | 1 request per second, one session | Full index takes an hour from Dhaka, several nights from a US runner |
-| D1 writes | 100,000 rows a day | Twelve-month window in D1, deep history in Parquet, 45,000 rows per run |
+| D1 writes | 100,000 a day, and every index entry counts as a write | Budget kept in writes, not rows: a tender row costs five. Awards never go in as rows; bidder and entity profiles carry JSON aggregates. 80,000 writes a day across both runs, tracked in the watermark |
 | D1 statement size | about 100 KB | Byte-aware batching, roughly 150 rows per statement |
 | GitHub Actions | 6 hours per job | 300-minute crawl budget, checkpoint and resume |
 | Push per subscription | 20 per hourly run | A noisy filter cannot flood a phone |

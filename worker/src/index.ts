@@ -1,9 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import {
-  bidderAwardsQuery, bidderQuery, parseTenderFilters, peQuery, peTopBiddersQuery, predictionQuery,
-  similarAwardsQuery, tenderByIdQuery, tenderListQuery,
-} from "./query";
+import { bidderQuery, parseJsonList, parseTenderFilters, peQuery, predictionQuery, tenderByIdQuery, tenderListQuery } from "./query";
 import { newSubscriptionId, validateSubscription } from "./subscriptions";
 import { runAlerts } from "./alerts";
 import { hashIp, validateAccessRequest } from "./access";
@@ -51,33 +48,32 @@ app.get("/api/v1/tenders/:id", async (c) => {
   const q = tenderByIdQuery(id);
   const tender = await c.env.DB.prepare(q.sql).bind(...q.params).first<Record<string, unknown>>();
   if (!tender) return c.json({ error: "not found" }, 404);
-  const s = similarAwardsQuery(String(tender.pe_id ?? ""));
+  const pe = peQuery(String(tender.pe_id ?? ""));
   const p = predictionQuery(id);
-  const [similar, prediction] = await c.env.DB.batch([
-    c.env.DB.prepare(s.sql).bind(...s.params),
+  const [entity, prediction] = await c.env.DB.batch([
+    c.env.DB.prepare(pe.sql).bind(...pe.params),
     c.env.DB.prepare(p.sql).bind(...p.params),
   ]);
-  return c.json({ tender, similar_awards: similar.results ?? [], prediction: prediction.results?.[0] ?? null });
+  const entityRow = (entity.results?.[0] as Record<string, unknown> | undefined) ?? {};
+  return c.json({ tender, similar_awards: parseJsonList(entityRow.recent_awards), prediction: prediction.results?.[0] ?? null });
 });
 
 app.get("/api/v1/bidders/:id", async (c) => {
   const id = c.req.param("id");
   const b = bidderQuery(id);
-  const bidder = await c.env.DB.prepare(b.sql).bind(...b.params).first();
+  const bidder = await c.env.DB.prepare(b.sql).bind(...b.params).first<Record<string, unknown>>();
   if (!bidder) return c.json({ error: "not found" }, 404);
-  const a = bidderAwardsQuery(id);
-  const { results } = await c.env.DB.prepare(a.sql).bind(...a.params).all();
-  return c.json({ bidder, awards: results ?? [] });
+  const { recent_awards, ...rest } = bidder;
+  return c.json({ bidder: rest, awards: parseJsonList(recent_awards) });
 });
 
 app.get("/api/v1/pe/:id", async (c) => {
   const id = c.req.param("id");
   const p = peQuery(id);
-  const pe = await c.env.DB.prepare(p.sql).bind(...p.params).first();
+  const pe = await c.env.DB.prepare(p.sql).bind(...p.params).first<Record<string, unknown>>();
   if (!pe) return c.json({ error: "not found" }, 404);
-  const t = peTopBiddersQuery(id);
-  const { results } = await c.env.DB.prepare(t.sql).bind(...t.params).all();
-  return c.json({ procuring_entity: pe, top_bidders: results ?? [] });
+  const { recent_awards, top_bidders, ...rest } = pe;
+  return c.json({ procuring_entity: rest, top_bidders: parseJsonList(top_bidders), recent_awards: parseJsonList(recent_awards) });
 });
 
 app.get("/api/v1/filters", async (c) => {

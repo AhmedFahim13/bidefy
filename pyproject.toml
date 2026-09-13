@@ -8,6 +8,7 @@ dependencies = [
     "pyarrow>=15",
     "pyyaml>=6",
     "markdown>=3.5",
+    "scikit-learn>=1.4",
 ]
 
 [dependency-groups]

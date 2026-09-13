@@ -17,3 +17,17 @@ uv run python -m bidefy.crawler.run --endpoint tenders --mode delta
 Runs nightly on GitHub Actions at one request per second, checkpointed in `checkpoints/`,
 data committed under `data/raw/`. Backfill resumes across nights until `next_page` passes
 `total_pages`; scheduled runs then switch to delta automatically.
+
+## Worker API
+
+Live at `https://bidefy.iba-jobs.workers.dev`. Routes: `/api/v1/health`,
+`/api/v1/tenders?q=&status=&ministry=&page=&size=`, `/api/v1/tenders/:id`,
+`/api/v1/bidders/:id`, `/api/v1/pe/:id`. Data is loaded from `data/clean/` into D1
+within the free tier's 100,000 row writes a day.
+
+```bash
+cd worker && npm install && npm test && npm run typecheck
+npm run schema:remote          # once
+npx wrangler deploy
+cd .. && uv run python -m bidefy.export.d1 --max-rows 90000   # nightly-sized load
+```

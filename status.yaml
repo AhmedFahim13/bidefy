@@ -12,7 +12,7 @@ phases:
       - {id: w1-session, title: "Session, rate limiter, crawl policy", owner: claude, state: done, weight: 3}
       - {id: w1-workflow, title: "Nightly crawl workflow", owner: claude, state: done, weight: 2}
       - {id: w1-backfill, title: "Full tender index backfilled", owner: claude, state: doing, weight: 3, note: "Runs across nights; see checkpoint"}
-      - {id: w1-centre, title: "Command centre on GitHub Pages", owner: claude, state: doing, weight: 2}
+      - {id: w1-centre, title: "Command centre on GitHub Pages", owner: claude, state: done, weight: 2}
       - {id: w1-cloudflare, title: "Create Cloudflare account and run wrangler login", owner: fahim, state: todo, weight: 1, note: "Needed before week 2 D1 work"}
       - {id: w1-terms, title: "Read e-GP terms and disclaimer pages once", owner: fahim, state: todo, weight: 1, note: "eprocure.gov.bd/TermsNConditions.jsp and /PrivacyPolicy.jsp"}
   - id: w2

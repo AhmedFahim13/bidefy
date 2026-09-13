@@ -3,7 +3,7 @@
 Tender intelligence for Bangladesh's public e-GP procurement portal.
 
 - Design spec: `docs/superpowers/specs/2026-09-13-bidefy-design.md`
-- Command centre: published by the Pages workflow (link added once live)
+- Command centre: https://ahmedfahim13.github.io/bidefy/ (dashboard) and https://ahmedfahim13.github.io/bidefy/doc.html (product document)
 
 ## Crawler
 

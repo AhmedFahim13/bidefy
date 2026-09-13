@@ -23,12 +23,12 @@ A classifier that must answer every time is wrong more often than one allowed to
 | Training titles including title-keyword labels | 4,600 |
 | Held-out test titles | 1,151 |
 | Classes | 15 |
-| Accuracy on acted-on predictions | 0.905 |
-| Deferral rate | 0.166 |
+| Accuracy on acted-on predictions | 0.906 |
+| Deferral rate | 0.158 |
 | Macro F1 over all predictions | 0.843 |
 | Confidence threshold | 0.55 |
 
-Read the first two rows together: 90.5 percent of the categories Bidefy commits to are right, and it declines to commit on 16.6 percent of tenders. The command centre shows the live figures from `models/metrics.json` after every nightly retrain.
+Read the first two rows together: 90.6 percent of the categories Bidefy commits to are right, and it declines to commit on 15.8 percent of tenders. The command centre shows the live figures from `models/metrics.json` after every nightly retrain.
 
 ## Budgets that shape the design
 

@@ -1,0 +1,16 @@
+{
+  "category_classifier": {
+    "accuracy_acted": 0.9061,
+    "deferral_rate": 0.1581,
+    "coverage": 0.8419,
+    "macro_f1": 0.8429,
+    "accuracy_all": 0.8558,
+    "n_train": 4600,
+    "n_test": 1151,
+    "n_classes": 15,
+    "threshold": 0.55,
+    "labels_from_tags": 1157,
+    "labels_from_title": 4594,
+    "trained_at": "2026-09-13T10:02:20Z"
+  }
+}

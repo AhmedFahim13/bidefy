@@ -35,9 +35,10 @@ phases:
   - id: w4
     name: "Week 4: classifier, alert cron, public launch"
     tasks:
-      - {id: w4-classifier, title: "Category classifier with metrics and deferral", owner: claude, state: todo, weight: 3}
-      - {id: w4-cron, title: "Hourly alert matcher and push sender", owner: claude, state: todo, weight: 3}
-      - {id: w4-launch, title: "Public launch v0.1", owner: claude, state: todo, weight: 2}
+      - {id: w4-sample, title: "Detail-page sample for training labels", owner: claude, state: done, weight: 1}
+      - {id: w4-classifier, title: "Category classifier with metrics and deferral", owner: claude, state: done, weight: 3, note: "0.905 acted accuracy at 0.166 deferral"}
+      - {id: w4-cron, title: "Hourly alert matcher and push sender", owner: claude, state: done, weight: 3, note: "Admin dry-run endpoint verified; bootstrap rule prevents backlog spam"}
+      - {id: w4-launch, title: "Public launch v0.1", owner: claude, state: done, weight: 2, note: "Tagged v0.1.0"}
       - {id: w4-post, title: "Write and publish the launch post", owner: fahim, state: todo, weight: 1}
   - id: w5
     name: "Week 5: award-value model"

@@ -1,6 +1,7 @@
 # Bidefy
 
 Live site: https://bidefy.vercel.app
+Status: v0.1 public. Free tier: live tenders, search, categories, up to three push alert filters.
 
 Tender intelligence for Bangladesh's public e-GP procurement portal.
 

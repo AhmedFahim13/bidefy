@@ -62,8 +62,8 @@ def _labelled(data_root: Path) -> tuple[pl.DataFrame, int, int]:
 def _pipeline(seed: int) -> Pipeline:
     return Pipeline([
         ("features", FeatureUnion([
-            ("word", TfidfVectorizer(analyzer="word", ngram_range=(1, 2), min_df=1, sublinear_tf=True)),
-            ("char", TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5), min_df=1, sublinear_tf=True)),
+            ("word", TfidfVectorizer(analyzer="word", ngram_range=(1, 2), min_df=2, max_features=40_000, sublinear_tf=True, dtype=np.float32)),
+            ("char", TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5), min_df=2, max_features=120_000, sublinear_tf=True, dtype=np.float32)),
         ])),
         ("clf", LogisticRegression(C=4.0, max_iter=2000, class_weight="balanced", random_state=seed)),
     ])
@@ -105,7 +105,7 @@ def train(data_root: Path, models_dir: Path, threshold: float = DEFAULT_THRESHOL
     models_dir = Path(models_dir)
     models_dir.mkdir(parents=True, exist_ok=True)
     final = _pipeline(seed).fit(X, y)          # refit on everything for deployment
-    joblib.dump({"model": final, "threshold": threshold, "classes": list(final.classes_)}, models_dir / "category.joblib")
+    joblib.dump({"model": final, "threshold": threshold, "classes": list(final.classes_)}, models_dir / "category.joblib", compress=3)
     metrics_path = models_dir / "metrics.json"
     existing = json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path.exists() else {}
     existing["category_classifier"] = metrics

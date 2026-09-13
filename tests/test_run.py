@@ -163,6 +163,27 @@ def test_backfill_abort_stores_fetched_pages_and_leaves_next_page(tmp_path):
     assert Checkpoint.load(_cp(tmp_path)).next_page == 3
 
 
+def test_backfill_saves_summary_only_via_flush(tmp_path, monkeypatch):
+    save_calls = []
+    orig_save = Checkpoint.save
+
+    def counting_save(self, path):
+        save_calls.append(path)
+        return orig_save(self, path)
+
+    monkeypatch.setattr(Checkpoint, "save", counting_save)
+
+    session = FakeSession(total_pages_override=3)
+    summary = run.crawl(session, "tenders", "backfill", tmp_path / "data", _cp(tmp_path), time_budget_s=10_000)
+
+    assert summary.status == "done" and summary.pages == 3
+    assert len(save_calls) == 1   # one flush (3 pages, well under FLUSH_EVERY_PAGES) -> one save
+    cp = Checkpoint.load(_cp(tmp_path))
+    assert cp.last_run_status == "done"
+    assert cp.last_run_pages == summary.pages
+    assert cp.last_run_rows == summary.rows
+
+
 def test_backfill_handles_shrinking_page_count(tmp_path):
     # The checkpoint (and pages 1-3) still say 5 total pages, but page 4 comes
     # back empty and reports the true total of 3: that must end the run

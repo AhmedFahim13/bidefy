@@ -64,13 +64,15 @@ def crawl(
     buffer: list[dict] = []
 
     def flush() -> None:
-        """Write whatever has accumulated in the buffer and save the checkpoint
-        right after, so a crash can never leave the checkpoint ahead of the data."""
+        """Write whatever has accumulated in the buffer, then save the checkpoint,
+        so a crash can never leave the checkpoint ahead of the data. The
+        checkpoint is saved even when the buffer is empty, so mode switches and
+        the run summary always reach disk at a flush point."""
         nonlocal buffer
         if buffer:
             store.append_rows(buffer, data_root, endpoint)
             buffer = []
-            cp.save(checkpoint_path)
+        cp.save(checkpoint_path)
 
     if mode == "backfill":
         cp.mode = "backfill"
@@ -114,6 +116,7 @@ def crawl(
                 flush()
                 buffered_pages = 0
             page += 1
+        cp.last_run_pages, cp.last_run_rows, cp.last_run_status = summary.pages, summary.rows, summary.status
         flush()
 
     elif mode == "delta":
@@ -173,12 +176,11 @@ def crawl(
                 summary.status = "done"
                 break
             page += 1
+        cp.last_run_pages, cp.last_run_rows, cp.last_run_status = summary.pages, summary.rows, summary.status
         flush()
     else:
         raise ValueError(f"unknown mode {mode}")
 
-    cp.last_run_pages, cp.last_run_rows, cp.last_run_status = summary.pages, summary.rows, summary.status
-    cp.save(checkpoint_path)
     log(f"{endpoint} {mode}: {summary.status}, {summary.pages} pages, {summary.rows} rows")
     return summary
 

@@ -1,0 +1,22 @@
+{
+  "name": "bidefy-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "schema:remote": "wrangler d1 execute bidefy --remote --file schema.sql --yes",
+    "schema:local": "wrangler d1 execute bidefy --local --file schema.sql --yes"
+  },
+  "dependencies": {
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260911.1",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "wrangler": "^4.0.0"
+  }
+}

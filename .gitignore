@@ -5,3 +5,5 @@ __pycache__/
 site/
 review/*.tmp
 build/
+worker/node_modules/
+worker/.wrangler/

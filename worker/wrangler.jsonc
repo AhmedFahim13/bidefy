@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bidefy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "bidefy", "database_id": "9a19c0e9-6e01-4066-8615-8eee5267ce2c" }
+  ],
+  "triggers": { "crons": ["0 * * * *"] }
+}

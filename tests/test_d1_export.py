@@ -55,7 +55,18 @@ def test_statements_are_batched(tmp_path: Path):
     pl.DataFrame(rows).write_parquet(tmp_path / "clean" / "tenders.parquet")
     plan = d1.plan_load(tmp_path, d1.Watermark(), max_rows=5000, today="2026-09-13")
     tender_stmts = [s for s in plan.statements if s.startswith("INSERT OR REPLACE INTO tenders")]
-    assert len(tender_stmts) == 3 and plan.rows == 1200
+    assert len(tender_stmts) == 6 and plan.rows == 1200
+
+
+def test_statements_stay_under_the_byte_cap(tmp_path: Path):
+    (tmp_path / "clean").mkdir()
+    rows = [{"tender_id": str(i), "title": "x" * 3000, "fetched_at": "20260913", "published_at": "2026-09-01T00:00",
+             "status": "Live"} for i in range(100)]
+    pl.DataFrame(rows).write_parquet(tmp_path / "clean" / "tenders.parquet")
+    plan = d1.plan_load(tmp_path, d1.Watermark(), max_rows=5000, today="2026-09-13")
+    assert plan.rows == 100
+    assert all(len(s.encode("utf-8")) <= d1.MAX_STATEMENT_BYTES for s in plan.statements)
+    assert len(plan.statements) >= 4
 
 
 def test_watermark_roundtrip(tmp_path: Path):
@@ -78,7 +89,7 @@ def test_execute_raises_on_wrangler_failure(tmp_path: Path):
 
     class R:
         def __init__(self, code):
-            self.returncode, self.stderr = code, "boom"
+            self.returncode, self.stderr, self.stdout = code, "boom", ""
 
     def runner(cmd, **kw):
         calls.append(cmd)

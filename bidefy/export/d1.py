@@ -11,7 +11,8 @@ from pathlib import Path
 import polars as pl
 
 WINDOW_MONTHS = 12
-BATCH_ROWS = 500
+BATCH_ROWS = 200                 # upper bound on rows per INSERT
+MAX_STATEMENT_BYTES = 90_000     # D1 rejects statements near 100 KB with SQLITE_TOOBIG
 DEFAULT_MAX_ROWS = 90_000
 TABLES = {
     "tenders": ["tender_id", "reference", "status", "note", "nature", "title", "ministry", "organization",
@@ -62,12 +63,22 @@ def _sql_value(v) -> str:
 
 
 def _inserts(table: str, df: pl.DataFrame) -> list[str]:
+    """Multi-row INSERT OR REPLACE statements, each under BATCH_ROWS rows and MAX_STATEMENT_BYTES bytes."""
     cols = [c for c in TABLES[table] if c in df.columns]
-    out = []
-    rows = df.select(cols).rows()
-    for i in range(0, len(rows), BATCH_ROWS):
-        values = ",\n".join("(" + ", ".join(_sql_value(v) for v in row) + ")" for row in rows[i:i + BATCH_ROWS])
-        out.append(f"INSERT OR REPLACE INTO {table} ({', '.join(cols)}) VALUES\n{values};")
+    head = f"INSERT OR REPLACE INTO {table} ({', '.join(cols)}) VALUES\n"
+    out: list[str] = []
+    chunk: list[str] = []
+    size = len(head.encode("utf-8"))
+    for row in df.select(cols).rows():
+        value = "(" + ", ".join(_sql_value(v) for v in row) + ")"
+        vbytes = len(value.encode("utf-8")) + 2
+        if chunk and (len(chunk) >= BATCH_ROWS or size + vbytes > MAX_STATEMENT_BYTES):
+            out.append(head + ",\n".join(chunk) + ";")
+            chunk, size = [], len(head.encode("utf-8"))
+        chunk.append(value)
+        size += vbytes
+    if chunk:
+        out.append(head + ",\n".join(chunk) + ";")
     return out
 
 
@@ -131,9 +142,10 @@ def execute(files: list[Path], database: str, remote: bool, runner=subprocess.ru
     for path in files:
         cmd = ["npx", "wrangler", "d1", "execute", database, "--remote" if remote else "--local",
                "--file", str(Path(path).resolve()), "--yes"]
-        result = runner(cmd, cwd="worker", shell=True, capture_output=True, text=True)
+        result = runner(cmd, cwd="worker", shell=True, capture_output=True, encoding="utf-8", errors="replace")
         if result.returncode != 0:
-            raise RuntimeError(f"wrangler failed on {Path(path).name}: {result.stderr[-2000:]}")
+            detail = ((result.stderr or "") + (result.stdout or ""))[-2000:]
+            raise RuntimeError(f"wrangler failed on {Path(path).name}: {detail}")
 
 
 def main(argv: list[str] | None = None) -> int:

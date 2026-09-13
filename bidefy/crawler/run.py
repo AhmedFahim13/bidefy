@@ -13,6 +13,8 @@ from .session import EgpSession, HttpFailure, SessionExpired
 
 MAX_CONSECUTIVE_FAILURES = 3
 PAGE_SIZE = 200
+DELTA_MAX_PAGES = 50
+FLUSH_EVERY_PAGES = 50
 PARSERS: dict[str, Callable[[str], tuple[list[dict], int]]] = {
     "tenders": parse.parse_tender_rows,
     "contracts": parse.parse_contract_rows,
@@ -29,17 +31,19 @@ class Summary:
 
 
 def _fetch(session, endpoint: str, page: int, parser, log) -> tuple[list[dict], int] | None:
-    """One page with the failure policy applied by the caller. Returns None on failure."""
+    """One page. Returns (rows, total) from the parser, or None on a transport failure."""
     try:
         html = session.list_page(endpoint, page, PAGE_SIZE)
     except (HttpFailure, SessionExpired) as e:
         log(f"page {page}: {type(e).__name__}: {e}")
         return None
-    rows, total = parser(html)
-    if not rows:
-        log(f"page {page}: zero rows")
-        return None
-    return rows, total
+    return parser(html)
+
+
+def _zero_rows_is_end_of_data(cp: Checkpoint, page: int) -> bool:
+    """A page with zero rows is the end of the data once we know its number is
+    at or past the last known page. Otherwise it looks like a bad response."""
+    return bool(cp.total_pages) and page >= cp.total_pages
 
 
 def crawl(
@@ -57,9 +61,21 @@ def crawl(
     summary = Summary(endpoint=endpoint, mode=mode)
     started = now()
     failures = 0
+    buffer: list[dict] = []
+
+    def flush() -> None:
+        """Write whatever has accumulated in the buffer and save the checkpoint
+        right after, so a crash can never leave the checkpoint ahead of the data."""
+        nonlocal buffer
+        if buffer:
+            store.append_rows(buffer, data_root, endpoint)
+            buffer = []
+            cp.save(checkpoint_path)
 
     if mode == "backfill":
+        cp.mode = "backfill"
         page = cp.next_page
+        buffered_pages = 0
         while True:
             if cp.total_pages and page > cp.total_pages:
                 summary.status = "done"
@@ -74,24 +90,45 @@ def crawl(
                     summary.status = "aborted"
                     break
                 continue
-            failures = 0
             rows, total = got
-            store.append_rows(rows, data_root, endpoint)
+            if total > 0:
+                cp.total_pages = total
+            if not rows:
+                if _zero_rows_is_end_of_data(cp, page):
+                    log(f"page {page}: zero rows, end of data (total_pages={cp.total_pages})")
+                    summary.status = "done"
+                    break
+                log(f"page {page}: zero rows")
+                failures += 1
+                if failures >= MAX_CONSECUTIVE_FAILURES:
+                    summary.status = "aborted"
+                    break
+                continue
+            failures = 0
+            buffer.extend(rows)
+            buffered_pages += 1
             summary.pages += 1
             summary.rows += len(rows)
-            cp.total_pages = total or cp.total_pages
             cp.next_page = page + 1
-            cp.mode = "backfill"
-            cp.save(checkpoint_path)
+            if buffered_pages >= FLUSH_EVERY_PAGES:
+                flush()
+                buffered_pages = 0
             page += 1
+        flush()
 
     elif mode == "delta":
+        cp.mode = "delta"
         known = store.known_ids(data_root, endpoint)
         page = 1
         newest = cp.newest_id_seen
+        buffered_pages = 0
         while True:
             if now() - started > time_budget_s:
                 summary.status = "budget"
+                break
+            if page > DELTA_MAX_PAGES:
+                log(f"page {page}: exceeded DELTA_MAX_PAGES ({DELTA_MAX_PAGES}), stopping")
+                summary.status = "done"
                 break
             got = _fetch(session, endpoint, page, parser, log)
             if got is None:
@@ -100,22 +137,43 @@ def crawl(
                     summary.status = "aborted"
                     break
                 continue
-            failures = 0
             rows, total = got
+            if total > 0:
+                cp.total_pages = total
+            if not rows:
+                if _zero_rows_is_end_of_data(cp, page):
+                    log(f"page {page}: zero rows, end of data (total_pages={cp.total_pages})")
+                    summary.status = "done"
+                    break
+                log(f"page {page}: zero rows")
+                failures += 1
+                if failures >= MAX_CONSECUTIVE_FAILURES:
+                    summary.status = "aborted"
+                    break
+                continue
+            failures = 0
             new_rows = [r for r in rows if r["tender_id"] not in known]
             summary.pages += 1
+            buffered_pages += 1
             if new_rows:
-                store.append_rows(new_rows, data_root, endpoint)
+                buffer.extend(new_rows)
                 summary.rows += len(new_rows)
                 known.update(r["tender_id"] for r in new_rows)
                 newest = max([newest] + [r["tender_id"] for r in new_rows], key=lambda s: int(s or 0))
-            if len(new_rows) < len(rows) or (total and page >= total):
+            cp.newest_id_seen = newest
+            if buffered_pages >= FLUSH_EVERY_PAGES:
+                flush()
+                buffered_pages = 0
+            if not new_rows:
+                log(f"page {page}: no new ids, stopping")
+                summary.status = "done"
+                break
+            if total and page >= total:
+                log(f"page {page}: reached last page ({total})")
                 summary.status = "done"
                 break
             page += 1
-        cp.mode = "delta"
-        cp.newest_id_seen = newest
-        cp.save(checkpoint_path)
+        flush()
     else:
         raise ValueError(f"unknown mode {mode}")
 

@@ -2,7 +2,8 @@ name: Crawl e-GP
 
 on:
   schedule:
-    - cron: "0 20 * * *"        # 02:00 Dhaka
+    - cron: "0 20 * * *"        # 02:00 Dhaka - tenders
+    - cron: "0 8 * * *"         # 14:00 Dhaka - contracts
   workflow_dispatch:
     inputs:
       endpoint:
@@ -33,10 +34,17 @@ jobs:
       - name: Decide mode for scheduled runs
         id: mode
         run: |
-          EP="${{ github.event.inputs.endpoint || 'tenders' }}"
+          EP="${{ github.event.inputs.endpoint }}"
+          if [ -z "$EP" ]; then
+            if [ "${{ github.event.schedule }}" = "0 8 * * *" ]; then
+              EP=contracts
+            else
+              EP=tenders
+            fi
+          fi
           MODE="${{ github.event.inputs.mode || '' }}"
           if [ -z "$MODE" ]; then
-            if [ -f "checkpoints/$EP.json" ] && python -c "import json,sys;c=json.load(open('checkpoints/$EP.json'));sys.exit(0 if c['total_pages'] and c['next_page']>c['total_pages'] else 1)"; then
+            if [ -f "checkpoints/$EP.json" ] && python3 -c "import json,sys;c=json.load(open('checkpoints/$EP.json'));sys.exit(0 if c['total_pages'] and c['next_page']>c['total_pages'] else 1)"; then
               MODE=delta
             else
               MODE=backfill
@@ -46,6 +54,10 @@ jobs:
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
       - name: Crawl
         run: uv run python -m bidefy.crawler.run --endpoint "${{ steps.mode.outputs.endpoint }}" --mode "${{ steps.mode.outputs.mode }}" --budget-min "${{ github.event.inputs.budget_min || '300' }}"
+      - name: Compact
+        env:
+          EP: ${{ steps.mode.outputs.endpoint }}
+        run: uv run python -m bidefy.crawler.store compact --endpoint "$EP"
       - name: Commit data
         run: |
           git config user.name "bidefy-bot"
@@ -53,5 +65,17 @@ jobs:
           git add data checkpoints
           if git diff --cached --quiet; then echo "nothing to commit"; exit 0; fi
           git commit -m "data: ${{ steps.mode.outputs.endpoint }} ${{ steps.mode.outputs.mode }} $(date -u +%Y-%m-%dT%H:%MZ)"
-          git pull --rebase
-          git push
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
+            if git pull --rebase && git push; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "push attempt $attempt failed"
+            if [ "$attempt" -eq 3 ]; then
+              echo "giving up after 3 attempts"
+              exit 1
+            fi
+            sleep 15
+            attempt=$((attempt + 1))
+          done

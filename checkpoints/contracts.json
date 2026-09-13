@@ -1,0 +1,11 @@
+{
+  "endpoint": "contracts",
+  "next_page": 1055,
+  "total_pages": 4387,
+  "newest_id_seen": "",
+  "mode": "backfill",
+  "updated_at": "2026-09-13T11:06:04Z",
+  "last_run_pages": 1054,
+  "last_run_rows": 210800,
+  "last_run_status": "budget"
+}

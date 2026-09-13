@@ -32,9 +32,21 @@ def main() -> None:
 
     per_pe = awarded.group_by("bidder_id", "pe_id", "procuring_entity").len().sort("len", descending=True)
     specialist = per_pe.row(0, named=True)
-    ministries = awarded.group_by("bidder_id").agg(pl.col("ministry").n_unique().alias("n_min"), pl.len().alias("n")).filter(pl.col("n_min") >= 4).sort("n", descending=True)
+    # A common trade name (S.M Enterprise, Rahim Traders) merges several firms; require a regional footprint so the row is one firm.
+    ministries = (
+        awarded.group_by("bidder_id")
+        .agg(pl.col("ministry").n_unique().alias("n_min"), pl.col("district").n_unique().alias("n_dist"), pl.len().alias("n"))
+        .filter((pl.col("n_min") >= 4) & (pl.col("n_dist") <= 3))
+        .sort("n", descending=True)
+    )
     generalist = ministries.row(0, named=True) if ministries.height else None
-    recent_value = awarded.filter(pl.col("signed_on") >= year_ago).group_by("bidder_id").agg(pl.col("value_crore").fill_null(0).sum().alias("v"), pl.len().alias("n")).sort("v", descending=True)
+    recent_value = (
+        awarded.filter(pl.col("signed_on") >= year_ago)
+        .group_by("bidder_id")
+        .agg(pl.col("value_crore").fill_null(0).sum().alias("v"), pl.len().alias("n"))
+        .filter(pl.col("n") >= 3)
+        .sort("v", descending=True)
+    )
     infra = recent_value.row(0, named=True) if recent_value.height else None
     first = awarded.group_by("bidder_id").agg(pl.col("signed_on").min().alias("first"), pl.len().alias("n")).filter(pl.col("first") >= ninety).sort("n", descending=True)
     newcomer = first.row(0, named=True) if first.height else None
@@ -55,7 +67,11 @@ def main() -> None:
         lines += ["", f"**What Bidefy shows them:** {show}", ""]
         return "\n".join(lines)
 
-    parts = ["# Five buyer profiles", "", "These profiles are computed from public award data, not interviews. Each is a real bidder selected by a fixed rule; the rule is stated so the selection can be reproduced.", ""]
+    parts = ["# Five buyer profiles", "",
+             "These profiles are computed from public award data, not interviews. Each is a real bidder selected by a fixed rule; the rule is stated so the selection can be reproduced.",
+             "",
+             "Known limit: bidders are resolved by name, so a common trade name can combine several firms. The generalist rule therefore requires a footprint of three districts or fewer. Award values above 500 crore were keyed in taka on the portal and are converted to crore; no genuine award in the index is that large.",
+             ""]
     parts.append(block("The specialist", specialist["bidder_id"], [f"Rule: most awards at a single procuring entity ({specialist['procuring_entity']}, {specialist['len']} awards)."],
                        "Every new tender from that entity within the hour, the entity's award history, and the value band before they price."))
     if generalist:

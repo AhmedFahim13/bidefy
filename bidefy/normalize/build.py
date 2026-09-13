@@ -13,6 +13,8 @@ from . import resolve as r
 from .names import normalize_name
 
 EMPTY = {"tenders": 0, "contracts": 0, "bidders": 0, "procuring_entities": 0, "review_pairs": 0}
+MAX_VALUE_CRORE = 500.0    # above this the value cell was keyed in taka, not crore; divide by ten million
+TAKA_PER_CRORE = 10_000_000.0
 
 
 def _pe_id(name: str) -> str:
@@ -103,9 +105,16 @@ def build(data_root: Path, review_path: Path, models_dir: Path = Path("models"))
     n_bidders = 0
     if not contracts.is_empty():
         contracts = contracts.with_columns(
+            pl.when(pl.col("value_crore") > MAX_VALUE_CRORE)
+            .then(pl.col("value_crore") / TAKA_PER_CRORE)
+            .otherwise(pl.col("value_crore"))
+            .alias("value_crore")
+        )
+        contracts = contracts.with_columns(
             pl.col("awardee").fill_null("").map_elements(lambda a: res.entity_of.get(a, ""), return_dtype=pl.Utf8).alias("bidder_id"),
             pl.col("procuring_entity").fill_null("").map_elements(_pe_id, return_dtype=pl.Utf8).alias("pe_id"),
         )
+        contracts = _categorise(contracts, Path(models_dir))
         _write(contracts, data_root, "contracts")
         awarded = contracts.filter(pl.col("bidder_id") != "")
         stats = awarded.group_by("bidder_id").agg(

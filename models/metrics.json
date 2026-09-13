@@ -12,5 +12,17 @@
     "labels_from_tags": 1157,
     "labels_from_title": 4594,
     "trained_at": "2026-09-13T10:02:20Z"
+  },
+  "award_value_model": {
+    "mape_acted": 0.4935,
+    "mape_baseline": 0.5652,
+    "coverage_80": 0.7903,
+    "deferral_rate": 0.2534,
+    "band_ratio_median": 11.26,
+    "n_train": 168435,
+    "n_test": 42109,
+    "test_from": "2026-05-11",
+    "trained_at": "2026-09-13T11:19:07Z",
+    "model_version": "award-20260913"
   }
 }

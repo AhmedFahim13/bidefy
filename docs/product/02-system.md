@@ -30,6 +30,22 @@ A classifier that must answer every time is wrong more often than one allowed to
 
 Read the first two rows together: 90.6 percent of the categories Bidefy commits to are right, and it declines to commit on 15.8 percent of tenders. The command centre shows the live figures from `models/metrics.json` after every nightly retrain.
 
+## Award-value model at first training (week 5, 13 September 2026)
+
+| Figure | Value |
+|---|---|
+| Awards used | 210,544, split by signing date |
+| Training awards | 168,435 |
+| Test awards (latest 20 percent, from 11 May 2026) | 42,109 |
+| Median absolute percentage error, acted-on | 0.493 |
+| Same error for the naive baseline (median by entity and category) | 0.565 |
+| Coverage of the 80 percent band on acted-on test awards | 0.790 |
+| Deferral rate on test | 0.253 |
+| Median band width, high over low | about 11x |
+| Live tenders with a band | 2,651 of 3,405 |
+
+The band is a median model with split-conformal residual quantiles, calibrated per category where at least thirty calibration awards exist. Award values in Bangladesh span four orders of magnitude within one category, so an honest 80 percent band is wide; the product shows it as a range and the most likely value, and declines when the band would exceed 20x. The error figure is a median over held-out awards that happened after the training data, not a fit on the past.
+
 ## Budgets that shape the design
 
 | Budget | Value | Consequence |

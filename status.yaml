@@ -18,12 +18,12 @@ phases:
   - id: w2
     name: "Week 2: contracts, entity resolution, D1, Worker skeleton"
     tasks:
-      - {id: w2-contracts, title: "Contracts index backfilled", owner: claude, state: doing, weight: 3, note: "Scheduled daily at 14:00 Dhaka; runs across nights"}
+      - {id: w2-contracts, title: "Contracts index backfilled", owner: claude, state: doing, weight: 3, note: "210,674 awards in; 1,054 of 4,387 pages done, continues nightly"}
       - {id: w2-resolve, title: "Entity resolution with review queue", owner: claude, state: done, weight: 4}
       - {id: w2-d1, title: "D1 schema and nightly load within write limits", owner: claude, state: done, weight: 3}
       - {id: w2-worker, title: "Worker skeleton with Hono", owner: claude, state: done, weight: 2}
       - {id: w2-api-live, title: "Worker API live on workers.dev", owner: claude, state: done, weight: 1, note: "https://bidefy.iba-jobs.workers.dev/api/v1/health"}
-      - {id: w2-review, title: "Review review/pairs.csv when asked", owner: fahim, state: todo, weight: 1}
+      - {id: w2-review, title: "Review the top of review/pairs.csv (31,105 borderline name pairs; decide the ones that matter, ignore the rest)", owner: fahim, state: todo, weight: 1}
       - {id: w2-domain, title: "Stay on workers.dev", owner: fahim, state: done, weight: 1}
       - {id: w2-token, title: "Create a Cloudflare API token with D1 edit rights and add it as the CLOUDFLARE_API_TOKEN repo secret", owner: fahim, state: done, weight: 2}
   - id: w3
@@ -43,9 +43,9 @@ phases:
   - id: w5
     name: "Week 5: award-value model"
     tasks:
-      - {id: w5-model, title: "LightGBM award model with interval and baseline", owner: claude, state: todo, weight: 4}
-      - {id: w5-personas, title: "Five data-derived buyer profiles from the awards table, labelled as such", owner: claude, state: todo, weight: 2}
-      - {id: w5-signals, title: "Request-access form live and collecting real pricing signals", owner: claude, state: todo, weight: 2}
+      - {id: w5-model, title: "LightGBM award model with interval and baseline", owner: claude, state: done, weight: 4, note: "Median APE 0.49 vs 0.57 baseline, 80% band coverage 0.79, deferral 0.25"}
+      - {id: w5-personas, title: "Five data-derived buyer profiles from the awards table, labelled as such", owner: claude, state: done, weight: 2}
+      - {id: w5-signals, title: "Request-access form live and collecting real pricing signals", owner: claude, state: done, weight: 2, note: "bidefy.vercel.app/access"}
   - id: w6
     name: "Week 6: anomaly flags and profiles"
     tasks:

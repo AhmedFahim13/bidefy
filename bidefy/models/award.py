@@ -22,7 +22,7 @@ CAT_COLS = ["pe_id", "ministry", "method", "district", "category"]
 NUM_COLS = ["month", "year_offset", "title_len"]
 MIN_ROWS = 200
 MIN_CAL_PER_CATEGORY = 30
-DEFER_RATIO = 12.0
+DEFER_RATIO = 20.0     # a band wider than 20x is not actionable; decline rather than show it
 MIN_ENTITY_HISTORY = 3
 YEAR0 = 2020
 PARAMS = dict(n_estimators=300, learning_rate=0.05, num_leaves=15, min_child_samples=25, subsample=0.9,

@@ -113,3 +113,67 @@ def parse_tender_rows(html: str) -> tuple[list[dict], int]:
         )
     total = int(p.hidden.get("totalPages", "0") or 0)
     return rows, total
+
+
+_DAY_RE = re.compile(r"(\d{2}-[A-Za-z]{3}-\d{4})")
+
+
+def parse_day(text: str) -> str | None:
+    """'13-Sep-2026' -> '2026-09-13'. Returns None if no day found."""
+    m = _DAY_RE.search(text or "")
+    if not m:
+        return None
+    return datetime.strptime(m.group(1), "%d-%b-%Y").strftime("%Y-%m-%d")
+
+
+def parse_value_crore(text: str) -> float | None:
+    cleaned = re.sub(r"[^\d.]", "", text or "")
+    if not cleaned or cleaned.count(".") > 1:
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def parse_contract_rows(html: str) -> tuple[list[dict], int]:
+    """Rows from SearchNoaServlet. Returns (rows, total_pages)."""
+    p = _parse(html)
+    rows = []
+    for cells in p.rows:
+        if len(cells) < 8 or not cells[0].strip().isdigit():
+            continue
+        c_min, c_title, c_pe, c_dist, c_sign, c_award, c_val = cells[1], cells[2], cells[3], cells[4], cells[5], cells[6], cells[7]
+        title_lines = _lines(c_title)
+        head = title_lines[0] if title_lines else ""
+        tender_id, _, reference = head.partition(",")
+        rest = title_lines[1:]
+        # The advertisement date sits on the same line as the tail of the
+        # title, with no <br> between them (observed in the real fixture:
+        # the title text is wrapped in a <span class="more"> for CSS
+        # truncation only, not a duplicate "more"/"less" line). Strip the
+        # date (and anything after it) off the last line instead of
+        # discarding the whole line.
+        if rest:
+            last = _DATE_RE.split(rest[-1])[0].strip()
+            rest = rest[:-1] + ([last] if last else [])
+        middle = [l for l in rest if l.lower() not in ("more", "less", "...")]
+        title = " ".join(middle)
+        pe_lines = _lines(c_pe)
+        rows.append(
+            {
+                "tender_id": tender_id.strip(),
+                "reference": reference.strip(),
+                "title": title.replace("...", "").strip(),
+                "advertised_at": parse_datetime(c_title),
+                "ministry": " / ".join(_lines(c_min)),
+                "procuring_entity": " ".join(pe_lines[:-1]) if len(pe_lines) > 1 else (pe_lines[0] if pe_lines else ""),
+                "method": pe_lines[-1] if len(pe_lines) > 1 else "",
+                "district": " ".join(_lines(c_dist)),
+                "signed_on": parse_day(c_sign),
+                "awardee": " ".join(_lines(c_award)),
+                "value_crore": parse_value_crore(c_val),
+            }
+        )
+    total = int(p.hidden.get("totalPages", "0") or 0)
+    return rows, total

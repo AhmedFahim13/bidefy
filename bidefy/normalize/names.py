@@ -5,8 +5,12 @@ import re
 import unicodedata
 
 _PREFIX_RE = re.compile(r"^(?:m\s*/\s*s\.?|messrs\.?|ms\.?)\s+", re.I)
-_PUNCT_RE = re.compile(r"[^\w\s]", re.U)
 _SPACE_RE = re.compile(r"\s+")
+
+
+def _strip_punctuation(text: str) -> str:
+    """Replace punctuation and symbols with spaces. Combining marks (Bangla vowel signs, virama) stay."""
+    return "".join(" " if unicodedata.category(ch)[0] in "PS" else ch for ch in text)
 
 
 def normalize_name(raw: str) -> str:
@@ -14,7 +18,7 @@ def normalize_name(raw: str) -> str:
     text = unicodedata.normalize("NFKC", raw or "").strip().lower()
     text = _PREFIX_RE.sub("", text)
     text = text.replace("&", " and ")
-    text = _PUNCT_RE.sub(" ", text)
+    text = _strip_punctuation(text)
     text = _SPACE_RE.sub(" ", text).strip()
     return text
 

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
 
 CSS = """
-:root{--ink:#161925;--ink2:#4b5268;--ink3:#7c849c;--rule:#dce0ec;--bg:#f1f3f8;--card:#fff;--brand:#2a3a93;--ok:#15755b;--warn:#a5620b}
+:root{--ink:#161925;--ink2:#4b5268;--ink3:#5b6178;--rule:#dce0ec;--bg:#f1f3f8;--card:#fff;--brand:#2a3a93;--ok:#15755b;--warn:#a5620b}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 -apple-system,Segoe UI,Roboto,sans-serif}
 .wrap{max-width:1080px;margin:0 auto;padding:32px 24px}header{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:12px;margin-bottom:28px}
 h1{font-size:28px;margin:0;letter-spacing:-.02em}h2{font-size:20px;margin:32px 0 12px}h3{font-size:16px;margin:0 0 6px}
@@ -30,15 +30,21 @@ footer{margin-top:40px;color:var(--ink3);font-size:12px}
 """
 
 
+def _weight(task: dict) -> int:
+    """A task without an explicit weight counts as one unit."""
+    return int(task.get("weight", 1))
+
+
 def compute_progress(status: dict) -> dict:
-    tasks = [dict(t, phase=ph["name"]) for ph in status["phases"] for t in ph["tasks"]]
-    total_w = sum(t["weight"] for t in tasks) or 1
-    done_w = sum(t["weight"] for t in tasks if t["state"] == "done")
+    tasks = [dict(t, phase=ph["name"]) for ph in status["phases"] for t in ph.get("tasks", [])]
+    total_w = sum(_weight(t) for t in tasks) or 1
+    done_w = sum(_weight(t) for t in tasks if t["state"] == "done")
     phases = []
     for ph in status["phases"]:
-        pw = sum(t["weight"] for t in ph["tasks"]) or 1
-        pd = sum(t["weight"] for t in ph["tasks"] if t["state"] == "done")
-        phases.append({"id": ph["id"], "name": ph["name"], "percent": round(100 * pd / pw), "tasks": ph["tasks"]})
+        ph_tasks = ph.get("tasks", [])
+        pw = sum(_weight(t) for t in ph_tasks) or 1
+        pd = sum(_weight(t) for t in ph_tasks if t["state"] == "done")
+        phases.append({"id": ph["id"], "name": ph["name"], "percent": round(100 * pd / pw), "tasks": ph_tasks})
     pending = [t for t in tasks if t["state"] != "done"]
     return {
         "percent": round(100 * done_w / total_w),
@@ -53,17 +59,19 @@ def compute_progress(status: dict) -> dict:
 
 def _page(title: str, body: str, active: str) -> str:
     nav = "".join(
-        f'<a href="{href}"{" style=text-decoration:underline" if key == active else ""}>{label}</a>'
+        f'<a href="{href}"{" aria-current=\"page\" style=\"text-decoration:underline\"" if key == active else ""}>{label}</a>'
         for key, href, label in (("dash", "index.html", "Dashboard"), ("doc", "doc.html", "Product document"), ("repo", "https://github.com/AhmedFahim13/bidefy", "Repo"))
     )
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="wrap">
-<header><h1>{html.escape(title)}</h1><nav class="nav">{nav}</nav></header>{body}
+<header><h1>{html.escape(title)}</h1><nav class="nav">{nav}</nav></header><main>{body}</main>
 <footer>Built from status.yaml by tools/build_site.py. Zero production cost.</footer></div></body></html>"""
 
 
 def _task_li(t: dict) -> str:
-    tag = f'<span class="tag {"fahim" if t["owner"] == "fahim" else ""}">{t["owner"]}</span>'
+    owner = str(t.get("owner", ""))
+    cls = "tag fahim" if owner == "fahim" else "tag"
+    tag = f'<span class="{cls}">{html.escape(owner)}</span>'
     note = f' <span style="color:var(--ink3)">{html.escape(t["note"])}</span>' if t.get("note") else ""
     return f"<li>{html.escape(t['title'])}{tag}{note}</li>"
 
@@ -76,7 +84,7 @@ def render_dashboard(status: dict, p: dict, crawl: dict, metrics: dict | None) -
     ) or "<tr><td colspan=4>No crawl yet</td></tr>"
     metrics_html = (
         "<table><tr><th>Model</th><th>Metric</th><th>Value</th></tr>"
-        + "".join(f"<tr><td>{html.escape(m)}</td><td>{html.escape(k)}</td><td>{v}</td></tr>" for m, d in metrics.items() for k, v in d.items())
+        + "".join(f"<tr><td>{html.escape(m)}</td><td>{html.escape(k)}</td><td>{html.escape(str(v))}</td></tr>" for m, d in metrics.items() for k, v in d.items())
         + "</table>"
         if metrics else "<p style='color:var(--ink3)'>No models trained yet. First model lands in week 4.</p>"
     )
@@ -113,8 +121,16 @@ def load_sections(doc_dir: Path) -> list[tuple[str, str]]:
         text = path.read_text(encoding="utf-8")
         first, _, rest = text.partition("\n")
         title = first.lstrip("# ").strip() if first.startswith("#") else path.stem
-        out.append((title, markdown.markdown(rest if first.startswith("#") else text, extensions=["tables"])))
+        rendered = markdown.markdown(rest if first.startswith("#") else text, extensions=["tables"])
+        out.append((title, _demote_headings(rendered)))
     return out
+
+
+def _demote_headings(rendered: str) -> str:
+    """Shift h2/h3 in a section body to h3/h4 so each section's own h2 stays the top level."""
+    for level in (3, 2):
+        rendered = rendered.replace(f"<h{level}>", f"<h{level + 1}>").replace(f"</h{level}>", f"</h{level + 1}>")
+    return rendered
 
 
 def main() -> None:

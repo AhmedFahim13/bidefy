@@ -39,3 +39,32 @@ def test_render_doc_builds_toc():
     html = build_site.render_doc(STATUS, [("Overview", "<p>Hello</p>"), ("Market", "<p>World</p>")])
     assert "Overview" in html and "Market" in html and "<p>Hello</p>" in html
     assert 'href="#s1"' in html
+
+
+def test_missing_weight_counts_as_one_and_empty_phase_is_fine():
+    status = {"project": "B", "phases": [
+        {"id": "a", "name": "A", "tasks": [{"id": "x", "title": "x", "owner": "claude", "state": "done"},
+                                            {"id": "y", "title": "y", "owner": "fahim", "state": "todo", "weight": 3}]},
+        {"id": "b", "name": "B", "tasks": []},
+    ]}
+    p = build_site.compute_progress(status)
+    assert p["percent"] == 25
+    assert p["phases"][1]["percent"] == 0
+
+
+def test_dashboard_escapes_untrusted_strings():
+    status = {"project": "B", "phases": [{"id": "a", "name": "A", "tasks": [
+        {"id": "x", "title": "<b>t</b>", "owner": "<i>", "state": "todo", "weight": 1, "note": "<u>"}]}]}
+    p = build_site.compute_progress(status)
+    html_out = build_site.render_dashboard(status, p, crawl={}, metrics={"m": {"k": "<script>"}})
+    assert "<b>t</b>" not in html_out and "&lt;b&gt;t&lt;/b&gt;" in html_out
+    assert "<i>" not in html_out and "<u>" not in html_out and "<script>" not in html_out
+    assert 'class="tag "' not in html_out
+
+
+def test_doc_sections_demote_markdown_headings(tmp_path):
+    (tmp_path / "00-a.md").write_text("# Alpha\n\n## Sub\n\ntext\n\n### Deeper\n", encoding="utf-8")
+    sections = build_site.load_sections(tmp_path)
+    assert sections[0][0] == "Alpha"
+    assert "<h3>Sub</h3>" in sections[0][1] and "<h4>Deeper</h4>" in sections[0][1]
+    assert "<h2>" not in sections[0][1]

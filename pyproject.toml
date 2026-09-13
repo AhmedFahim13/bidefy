@@ -1,0 +1,25 @@
+[project]
+name = "bidefy"
+version = "0.1.0"
+description = "Tender intelligence for Bangladesh's e-GP procurement portal"
+requires-python = ">=3.12"
+dependencies = [
+    "polars>=1.0",
+    "pyarrow>=15",
+    "pyyaml>=6",
+    "markdown>=3.5",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["bidefy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

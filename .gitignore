@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
 .venv/
-data/
-*.parquet
+.pytest_cache/
+site/
+review/*.tmp

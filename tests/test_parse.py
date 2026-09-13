@@ -22,7 +22,7 @@ def test_parse_tender_row_fields(tenders_html):
     rows, _ = parse.parse_tender_rows(tenders_html)
     row = rows[0]
     assert set(row) == {
-        "tender_id", "reference", "status", "nature", "title",
+        "tender_id", "reference", "status", "note", "nature", "title",
         "ministry", "organization", "procuring_entity",
         "procurement_type", "method", "published_at", "closing_at",
     }
@@ -31,6 +31,15 @@ def test_parse_tender_row_fields(tenders_html):
     assert row["title"]
     assert row["published_at"].count("-") == 2 and "T" in row["published_at"]
     assert row["closing_at"] >= row["published_at"]
+
+
+def test_corrigendum_rows_have_empty_status_and_a_note(tenders_html):
+    rows, _ = parse.parse_tender_rows(tenders_html)
+    by_id = {r["tender_id"]: r for r in rows}
+    for tid in ("1332878", "1324653"):
+        assert by_id[tid]["status"] == ""
+        assert "Corrigendum" in by_id[tid]["note"]
+    assert sum(1 for r in rows if r["status"] == "Live") == 196
 
 
 def test_tender_ids_unique(tenders_html):

@@ -1,0 +1,61 @@
+project: Bidefy
+tagline: Tender intelligence for Bangladesh's e-GP portal
+launch_target: 2026-10-11
+phases:
+  - id: w1
+    name: "Week 1: crawler and index"
+    tasks:
+      - {id: w1-scaffold, title: "Package scaffold, pytest, CI", owner: claude, state: done, weight: 1}
+      - {id: w1-fixtures, title: "HTML fixtures from the portal", owner: claude, state: done, weight: 1}
+      - {id: w1-parse, title: "Parsers for tender, contract and detail pages", owner: claude, state: done, weight: 3}
+      - {id: w1-checkpoint, title: "Checkpoint and Parquet store", owner: claude, state: done, weight: 2}
+      - {id: w1-session, title: "Session, rate limiter, crawl policy", owner: claude, state: done, weight: 3}
+      - {id: w1-workflow, title: "Nightly crawl workflow", owner: claude, state: done, weight: 2}
+      - {id: w1-backfill, title: "Full tender index backfilled", owner: claude, state: doing, weight: 3, note: "Runs across nights; see checkpoint"}
+      - {id: w1-centre, title: "Command centre on GitHub Pages", owner: claude, state: doing, weight: 2}
+      - {id: w1-cloudflare, title: "Create Cloudflare account and run wrangler login", owner: fahim, state: todo, weight: 1, note: "Needed before week 2 D1 work"}
+      - {id: w1-terms, title: "Read e-GP terms and disclaimer pages once", owner: fahim, state: todo, weight: 1, note: "eprocure.gov.bd/TermsNConditions.jsp and /PrivacyPolicy.jsp"}
+  - id: w2
+    name: "Week 2: contracts, entity resolution, D1, Worker skeleton"
+    tasks:
+      - {id: w2-contracts, title: "Contracts index backfilled", owner: claude, state: todo, weight: 3}
+      - {id: w2-resolve, title: "Entity resolution with review queue", owner: claude, state: todo, weight: 4}
+      - {id: w2-d1, title: "D1 schema and nightly load within write limits", owner: claude, state: todo, weight: 3}
+      - {id: w2-worker, title: "Worker skeleton with Hono", owner: claude, state: todo, weight: 2}
+      - {id: w2-review, title: "Review review/pairs.csv when asked", owner: fahim, state: todo, weight: 1}
+      - {id: w2-domain, title: "Decide domain or workers.dev", owner: fahim, state: todo, weight: 1, note: "About 1,200 taka a year if bought"}
+  - id: w3
+    name: "Week 3: site pages, PWA, push"
+    tasks:
+      - {id: w3-pages, title: "Live tenders, tender, alerts pages", owner: claude, state: todo, weight: 4}
+      - {id: w3-pwa, title: "PWA manifest, service worker, push subscriptions", owner: claude, state: todo, weight: 3}
+  - id: w4
+    name: "Week 4: classifier, alert cron, public launch"
+    tasks:
+      - {id: w4-classifier, title: "Category classifier with metrics and deferral", owner: claude, state: todo, weight: 3}
+      - {id: w4-cron, title: "Hourly alert matcher and push sender", owner: claude, state: todo, weight: 3}
+      - {id: w4-launch, title: "Public launch v0.1", owner: claude, state: todo, weight: 2}
+      - {id: w4-post, title: "Write and publish the launch post", owner: fahim, state: todo, weight: 1}
+  - id: w5
+    name: "Week 5: award-value model"
+    tasks:
+      - {id: w5-model, title: "LightGBM award model with interval and baseline", owner: claude, state: todo, weight: 4}
+      - {id: w5-price, title: "Talk to five bidders about the Pro price", owner: fahim, state: todo, weight: 2}
+  - id: w6
+    name: "Week 6: anomaly flags and profiles"
+    tasks:
+      - {id: w6-flags, title: "Winner concentration and residual flags", owner: claude, state: todo, weight: 3}
+      - {id: w6-profiles, title: "Bidder and procuring entity profile pages", owner: claude, state: todo, weight: 3}
+  - id: w7
+    name: "Week 7: product document, pricing, polish"
+    tasks:
+      - {id: w7-doc, title: "Full product document in the Auto structure", owner: claude, state: todo, weight: 3}
+      - {id: w7-pricing, title: "Pricing page with request-access form", owner: claude, state: todo, weight: 2}
+      - {id: w7-polish, title: "Polish, stale banner, dashboard final", owner: claude, state: todo, weight: 2}
+  - id: w8
+    name: "Week 8: usage, demo, outreach"
+    tasks:
+      - {id: w8-usage, title: "Usage numbers collected and shown", owner: claude, state: todo, weight: 2}
+      - {id: w8-demo, title: "Record two-minute demo video", owner: fahim, state: todo, weight: 2}
+      - {id: w8-outreach, title: "Message the four Advanced AI Lab product managers", owner: fahim, state: todo, weight: 3}
+      - {id: w8-bkash, title: "bKash merchant account for the Pro tier (later)", owner: fahim, state: todo, weight: 1}

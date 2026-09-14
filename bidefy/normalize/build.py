@@ -76,6 +76,14 @@ def _pe_counts(df: pl.DataFrame, count_col: str, zero_col: str) -> pl.DataFrame:
     )
 
 
+def _briefs(data_root: Path) -> dict[str, str]:
+    """The notice's own description, where the detail page has been fetched."""
+    details = store.load_all(Path(data_root), "details")
+    if details.is_empty() or "brief" not in details.columns:
+        return {}
+    return {str(t): (b or "") for t, b in details.select("tender_id", "brief").iter_rows()}
+
+
 def _tag_categories(data_root: Path) -> dict[str, str]:
     """The portal's own category tags, mapped to Bidefy categories. Authoritative where present."""
     details = store.load_all(Path(data_root), "details")
@@ -107,7 +115,8 @@ def _categorise(tenders: pl.DataFrame, models_dir: Path, data_root: Path) -> pl.
     ids = tenders["tender_id"].cast(pl.Utf8).to_list()
     entities = tenders["procuring_entity"].fill_null("").to_list() if "procuring_entity" in tenders.columns else None
     ministries = tenders["ministry"].fill_null("").to_list() if "ministry" in tenders.columns else None
-    texts = classifier.compose(titles, entities, ministries)
+    brief_of = _briefs(data_root)
+    texts = classifier.compose(titles, entities, ministries, [brief_of.get(i, "") for i in ids])
     predicted = classifier.apply(texts, bundle, entities) if bundle else [("", 0.0)] * len(titles)
     categories, confidences, sources = [], [], []
     for tid, (cat, conf) in zip(ids, predicted):

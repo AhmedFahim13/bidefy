@@ -38,16 +38,25 @@ FALLBACK_THRESHOLD = 0.60
 MIN_LABELS = 60
 MIN_PER_CLASS = 5
 FOLDS = 5
-BUNDLE_FORMAT = 3
+BUNDLE_FORMAT = 4
+BRIEF_DROPOUT = 0.3        # so the model still works for tenders whose detail page is unfetched
 ENTITY_PRIOR_WEIGHT = 1.0   # a buyer's own history, combined with the text model as evidence
 
 
-def compose(titles, entities=None, ministries=None) -> list[str]:
-    """One text per tender. The buyer is part of the evidence: a hospital does not buy bridges."""
+def compose(titles, entities=None, ministries=None, briefs=None) -> list[str]:
+    """One text per tender: what is being bought, who is buying, and the notice's own description.
+
+    The buyer is evidence in itself, since a hospital does not buy bridges. The brief description
+    comes from the detail page and is fuller than the title; it is blank for tenders whose detail
+    page has not been fetched, which the model is trained to tolerate.
+    """
     titles = list(titles)
-    entities = list(entities) if entities is not None else [""] * len(titles)
-    ministries = list(ministries) if ministries is not None else [""] * len(titles)
-    return [f"{t or ''} || {e or ''} || {m or ''}" for t, e, m in zip(titles, entities, ministries)]
+    n = len(titles)
+    entities = list(entities) if entities is not None else [""] * n
+    ministries = list(ministries) if ministries is not None else [""] * n
+    briefs = list(briefs) if briefs is not None else [""] * n
+    return [f"{t or ''} || {e or ''} || {m or ''} || {b or ''}"
+            for t, e, m, b in zip(titles, entities, ministries, briefs)]
 
 
 def _labelled(data_root: Path) -> pl.DataFrame:
@@ -55,6 +64,9 @@ def _labelled(data_root: Path) -> pl.DataFrame:
     details = store.load_all(Path(data_root), "details")
     if details.is_empty() or "categories" not in details.columns:
         return pl.DataFrame()
+    briefs: dict[str, str] = {}
+    if "brief" in details.columns:
+        briefs = {str(t): (b or "") for t, b in details.select("tender_id", "brief").iter_rows()}
     labels: dict[str, str] = {}
     for tid, raw in details.select("tender_id", "categories").iter_rows():
         try:
@@ -84,7 +96,9 @@ def _labelled(data_root: Path) -> pl.DataFrame:
             .filter(pl.col("title").fill_null("").str.strip_chars() != ""))
     if rows.is_empty():
         return pl.DataFrame()
-    return rows.with_columns(pl.col("tender_id").replace_strict(labels, default=None).alias("label")).drop_nulls("label")
+    return (rows.with_columns(pl.col("tender_id").replace_strict(labels, default=None).alias("label"),
+                              pl.col("tender_id").replace_strict(briefs, default="").alias("brief"))
+            .drop_nulls("label"))
 
 
 def _pipeline(seed: int) -> Pipeline:
@@ -167,7 +181,10 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
     if df.height < MIN_LABELS or len(keep) < 2:
         return None
 
-    X = compose(df["title"], df["procuring_entity"], df["ministry"])
+    rng = np.random.default_rng(seed)
+    briefs = df["brief"].fill_null("").to_list() if "brief" in df.columns else [""] * df.height
+    kept = ["" if rng.random() < BRIEF_DROPOUT else b for b in briefs]
+    X = compose(df["title"], df["procuring_entity"], df["ministry"], kept)
     entities = df["procuring_entity"].fill_null("").to_list()
     y = np.array(df["label"].to_list())
     folds = min(FOLDS, int(counts.filter(pl.col("label").is_in(list(keep)))["len"].min()))
@@ -200,6 +217,7 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
         "threshold": round(threshold, 4),
         "target_accuracy": target_accuracy,
         "evaluation": "cross-validated on portal category tags only, entity priors from the training fold",
+        "brief_dropout": BRIEF_DROPOUT,
         "trained_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         **_deferral_for_accuracy(conf, correct),
     }

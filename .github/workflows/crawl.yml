@@ -79,16 +79,6 @@ jobs:
           uv run python -m bidefy.normalize.build
           uv run python -m bidefy.models.award train
           uv run python -m bidefy.models.award apply
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Load D1
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          (cd worker && npm ci --no-audit --no-fund)
-          uv run python -m bidefy.export.d1 --max-rows 45000
       - name: Commit data
         run: |
           git config user.name "bidefy-bot"
@@ -98,7 +88,7 @@ jobs:
           git commit -m "data: ${{ steps.mode.outputs.endpoint }} ${{ steps.mode.outputs.mode }} $(date -u +%Y-%m-%dT%H:%MZ)"
           attempt=1
           while [ "$attempt" -le 3 ]; do
-            if git pull --rebase && git push; then
+            if git pull --rebase --autostash && git push; then
               exit 0
             fi
             git rebase --abort 2>/dev/null || true
@@ -110,3 +100,21 @@ jobs:
             sleep 15
             attempt=$((attempt + 1))
           done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Load D1
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          (cd worker && npm ci --no-audit --no-fund)
+          uv run python -m bidefy.export.d1 --max-writes 40000
+      - name: Commit load watermark
+        continue-on-error: true
+        run: |
+          git add checkpoints
+          if git diff --cached --quiet; then echo "no watermark change"; exit 0; fi
+          git commit -m "data: d1 watermark $(date -u +%Y-%m-%dT%H:%MZ)"
+          git pull --rebase --autostash && git push

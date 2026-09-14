@@ -121,7 +121,7 @@ def _fit_text(fit: pd.DataFrame, others: list[pd.DataFrame], seed: int, folds: i
 
 def _fit_security(df: pd.DataFrame) -> dict | None:
     """Multiples of the published security, per method where there is enough history."""
-    rows = df[pd.to_numeric(df.get("security_bdt"), errors="coerce").fillna(0) > 0]
+    rows = df[_has_security(df)]
     if len(rows) < MIN_SECURITY_ROWS:
         return None
     sec_lakh = pd.to_numeric(rows["security_bdt"], errors="coerce").astype(float) / TAKA_PER_LAKH
@@ -144,7 +144,9 @@ def _method_quantiles(methods: np.ndarray, by_method: dict, lo: float, hi: float
 
 
 def _has_security(df: pd.DataFrame) -> np.ndarray:
-    return (pd.to_numeric(df.get("security_bdt"), errors="coerce").fillna(0) > 0).to_numpy()
+    if "security_bdt" not in df.columns:
+        return np.zeros(len(df), dtype=bool)
+    return (pd.to_numeric(df["security_bdt"], errors="coerce").fillna(0) > 0).to_numpy()
 
 
 # --------------------------------------------------------------------------- loading

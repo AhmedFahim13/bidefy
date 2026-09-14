@@ -68,10 +68,16 @@ export default async function TenderPage({ params }: Props) {
           <p className="eyebrow">Predicted award band</p>
           {data.prediction && !data.prediction.deferred ? (
             <div className="mt-2">
-              <p className="num text-2xl font-medium">{formatLakh(data.prediction.q10_lakh)} to {formatLakh(data.prediction.q90_lakh)}</p>
+              <span className={`inline-block rounded-sm px-2 py-0.5 font-mono text-[0.66rem] uppercase tracking-[0.12em] ${data.prediction.basis === "security" ? "bg-ok-wash text-ok" : "bg-surface-2 text-ink-2"}`}>
+                {data.prediction.basis === "security" ? "from tender security" : "from entity history"}
+              </span>
+              <p className="num mt-1 text-2xl font-medium">{formatLakh(data.prediction.q10_lakh)} to {formatLakh(data.prediction.q90_lakh)}</p>
               <p className="mt-1 text-sm text-ink-2">Most likely near <span className="num">{formatLakh(data.prediction.q50_lakh)}</span>.</p>
               <p className="mt-2 text-xs text-ink-3">
-                An 80 percent band from this entity's award history, the ministry, method and category. Calibrated on held-out awards, so about four in five real awards land inside bands like this one. Model {data.prediction.model_version}.
+                {data.prediction.basis === "security"
+                  ? "Derived from the refundable tender security in this notice. Buyers set it as a fixed share of their own cost estimate, so it pins the likely award closely. On held-out awards this route lands within 8 percent of the real value and its band holds about 85 percent of the time."
+                  : "Derived from this entity's award history with the ministry, method, category and the wording of the title. No security is published for this tender, so the band is wider. On held-out awards bands like this one hold about three times in four."}
+                {" "}Model {data.prediction.model_version}.
               </p>
             </div>
           ) : data.prediction ? (

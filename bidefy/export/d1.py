@@ -27,7 +27,7 @@ TABLES = {
                 "category", "category_confidence"],
     "bidders": ["bidder_id", "canonical_name", "variants", "n_awards", "total_value_crore", "first_award", "last_award", "recent_awards", "flags"],
     "procuring_entities": ["pe_id", "name", "ministry", "n_contracts", "n_tenders", "recent_awards", "top_bidders", "flags"],
-    "predictions": ["tender_id", "q10_lakh", "q50_lakh", "q90_lakh", "deferred", "model_version"],
+    "predictions": ["tender_id", "q10_lakh", "q50_lakh", "q90_lakh", "deferred", "basis", "model_version"],
 }
 # one row write per row plus one per index on the table (see worker/schema.sql and migrations)
 WRITE_WEIGHT = {"tenders": 5, "bidders": 1, "procuring_entities": 1, "predictions": 1}

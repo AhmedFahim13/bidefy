@@ -42,7 +42,7 @@ export function tenderByIdQuery(id: string): Query {
 }
 
 export function predictionQuery(id: string): Query {
-  return { sql: "SELECT q10_lakh, q50_lakh, q90_lakh, deferred, model_version FROM predictions WHERE tender_id = ?", params: [id] };
+  return { sql: "SELECT q10_lakh, q50_lakh, q90_lakh, deferred, basis, model_version FROM predictions WHERE tender_id = ?", params: [id] };
 }
 
 export function bidderQuery(id: string): Query {

@@ -43,7 +43,7 @@ export type Bidder = {
   first_award: string | null;
   last_award: string | null;
 };
-export type Prediction = { q10_lakh: number; q50_lakh: number; q90_lakh: number; deferred: number | boolean; model_version: string };
+export type Prediction = { q10_lakh: number; q50_lakh: number; q90_lakh: number; deferred: number | boolean; basis?: string | null; model_version: string };
 export type PE = { pe_id: string; name: string; ministry: string; n_contracts: number; n_tenders: number };
 export type TopBidder = { bidder_id: string; awardee: string; n_awards: number; total_value_crore: number };
 export type Stats = {

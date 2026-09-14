@@ -31,7 +31,7 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 from collections import defaultdict
 
 from ..crawler import store
-from .categories import label_from_tags
+from .categories import label_from_tags, label_margin
 
 TARGET_ACCURACY = 0.93     # the bar is set to deliver this, rather than picked by hand
 FALLBACK_THRESHOLD = 0.60
@@ -40,6 +40,11 @@ MIN_PER_CLASS = 5
 FOLDS = 5
 BUNDLE_FORMAT = 4
 BRIEF_DROPOUT = 0.3        # so the model still works for tenders whose detail page is unfetched
+MIN_TRAIN_MARGIN = 1       # 1 means no filtering. Training only on decisive labels was measured
+                           # to be much worse: it cost 9 points of deferral and 7 of macro F1.
+REPEATS = 3                # the same cross-validation, run this many times and pooled. One run of
+                           # it swings 1.7 points of deferral on identical data and an identical
+                           # seed, so a single run cannot tell a real change from its own noise.
 ENTITY_PRIOR_WEIGHT = 1.0   # a buyer's own history, combined with the text model as evidence
 
 
@@ -68,6 +73,7 @@ def _labelled(data_root: Path) -> pl.DataFrame:
     if "brief" in details.columns:
         briefs = {str(t): (b or "") for t, b in details.select("tender_id", "brief").iter_rows()}
     labels: dict[str, str] = {}
+    margins: dict[str, int] = {}
     for tid, raw in details.select("tender_id", "categories").iter_rows():
         try:
             tags = json.loads(raw or "[]")
@@ -76,6 +82,7 @@ def _labelled(data_root: Path) -> pl.DataFrame:
         label = label_from_tags(tags)
         if label:
             labels[str(tid)] = label
+            margins[str(tid)] = label_margin(tags)
     if not labels:
         return pl.DataFrame()
     wanted = ["tender_id", "title", "procuring_entity", "ministry"]
@@ -97,6 +104,7 @@ def _labelled(data_root: Path) -> pl.DataFrame:
     if rows.is_empty():
         return pl.DataFrame()
     return (rows.with_columns(pl.col("tender_id").replace_strict(labels, default=None).alias("label"),
+                              pl.col("tender_id").replace_strict(margins, default=0).alias("label_margin"),
                               pl.col("tender_id").replace_strict(briefs, default="").alias("brief"))
             .drop_nulls("label"))
 
@@ -192,7 +200,22 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
     y = np.array(df["label"].to_list())
     folds = min(FOLDS, int(counts.filter(pl.col("label").is_in(list(keep)))["len"].min()))
     conf_parts, correct_parts, pred_parts, true_parts = [], [], [], []
-    for tr, te in StratifiedKFold(n_splits=max(folds, 2), shuffle=True, random_state=seed).split(X, y):
+    per_repeat: list[tuple[float, float]] = []
+    margin = (df["label_margin"].to_numpy() if "label_margin" in df.columns
+              else np.ones(df.height, dtype=int))
+    for repeat in range(max(REPEATS, 1)):
+      mark = len(conf_parts)
+      for tr, te in StratifiedKFold(n_splits=max(folds, 2), shuffle=True,
+                                    random_state=seed + repeat).split(X, y):
+        # A rare category can lose every decisive label it has, and dropping the category outright
+        # would be a worse trade than keeping its weak labels, so those rows are put back.
+        if MIN_TRAIN_MARGIN > 1:
+            firm = margin[tr] >= MIN_TRAIN_MARGIN
+            for cls in set(y[tr]):
+                in_cls = y[tr] == cls
+                if not (firm & in_cls).any():
+                    firm |= in_cls
+            tr = tr[firm]
         fold = _pipeline(seed).fit([X_train[i] for i in tr], y[tr])
         classes = list(fold.classes_)
         proba = fold.predict_proba([X[i] for i in te])
@@ -201,6 +224,11 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
         conf_parts.append(proba.max(axis=1))
         pred = np.array([classes[i] for i in proba.argmax(axis=1)])
         pred_parts.append(pred); correct_parts.append(pred == y[te]); true_parts.append(y[te])
+      r_conf = np.concatenate(conf_parts[mark:]); r_correct = np.concatenate(correct_parts[mark:])
+      r_thr = _threshold_for_accuracy(r_conf, r_correct, target_accuracy)
+      per_repeat.append((float(1 - (r_conf >= r_thr).mean()),
+                         float(f1_score(np.concatenate(true_parts[mark:]),
+                                        np.concatenate(pred_parts[mark:]), average="macro"))))
     conf = np.concatenate(conf_parts)
     correct = np.concatenate(correct_parts)
     pred = np.concatenate(pred_parts)
@@ -221,6 +249,10 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
         "target_accuracy": target_accuracy,
         "evaluation": "cross-validated on portal category tags only, entity priors from the training fold",
         "brief_dropout": BRIEF_DROPOUT,
+        "min_train_margin": MIN_TRAIN_MARGIN,
+        "repeats": max(REPEATS, 1),
+        "deferral_spread": round(max(r[0] for r in per_repeat) - min(r[0] for r in per_repeat), 4),
+        "macro_f1_spread": round(max(r[1] for r in per_repeat) - min(r[1] for r in per_repeat), 4),
         "scored_with_brief": True,
         "trained_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         **_deferral_for_accuracy(conf, correct),

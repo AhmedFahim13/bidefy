@@ -60,47 +60,81 @@ def main() -> None:
     if aw:
         add("## Award value")
         add("")
-        add(f"Trained on {aw.get('n_fit', 0):,} awards, calibrated on {aw.get('n_calibration', 0):,} "
-            f"out-of-sample residuals, tested on the {aw.get('n_test', 0):,} most recent awards "
-            f"(everything signed on or after {aw.get('test_from', 'n/a')}). The test awards are later "
-            "in time than every award used to fit or calibrate, so this is a forecast, not a fit.")
+        add(f"The history route is trained on {aw.get('n_fit', 0):,} awards, calibrated on "
+            f"{aw.get('n_calibration', 0):,} out-of-sample residuals, and scored on the "
+            f"{aw.get('n_test', 0):,} most recent awards, everything signed on or after "
+            f"{aw.get('test_from', 'n/a')}. Every award it is scored on is later in time than every "
+            "award used to fit or calibrate it, so this is a forecast, not a fit.")
         add("")
         add("A tender notice publishes a refundable tender security. Buyers set it as a fixed share "
             "of a cost estimate they do not publish, and awards land near that estimate, so where a "
             "security exists it pins the value far more tightly than history can.")
         add("")
+        add("The two routes are measured on two different windows, and are never averaged into one "
+            "headline. The archive of awards reaches back years, but detail pages have only been "
+            "fetched for roughly the last year, so every published security on record is recent. "
+            "Split the whole archive by date and all of them land after the cut, leaving the "
+            "security multiplier nothing to learn from. So that route is given its own split, at "
+            "eighty percent of the securities by date, fitted on the earlier ones and scored on the "
+            "later ones. Both windows are strictly forward-looking.")
+        add("")
         add("| | From the tender security | From entity history |")
         add("|---|---|---|")
-        add(f"| Tenders in the test set | {aw.get('security_n', 0):,} | {aw.get('history_n', 0):,} |")
+        add(f"| Awards scored | {aw.get('security_n', 0):,} | {aw.get('history_n', 0):,} |")
+        add(f"| Fitted on | {aw.get('security_fitted_on', 0):,} earlier securities | {aw.get('n_fit', 0):,} earlier awards |")
+        add(f"| Scored on awards signed from | {aw.get('security_test_from', 'n/a')} | {aw.get('test_from', 'n/a')} |")
         add(f"| Median error of the central estimate | {pct(aw.get('security_mape'))} | {pct(aw.get('history_mape'))} |")
         add(f"| Share of awards inside the band | {pct(aw.get('security_coverage_80'))} | {pct(aw.get('history_coverage_80'))} |")
         add(f"| Typical band, high over low | {num(aw.get('security_band_width_median'))}x | {num(aw.get('history_band_width_median'))}x |")
         add("")
-        if aw.get("live_security_share") is not None:
+        add(f"Of the {aw.get('security_route_n_total', 0):,} awards in the archive whose notice "
+            "published a security, that is every one the route could be scored on without fitting "
+            "and testing on the same rows.")
+        add("")
+        share = aw.get("live_security_share")
+        if share is not None and aw.get("security_mape") is not None:
             add("### What a bidder actually meets")
             add("")
-            add(f"Of the tenders open right now, {pct(aw.get('live_security_share'))} publish a security and "
-                "take the precise route. The historical test window looks nothing like that, because its "
-                "detail pages have mostly never been fetched, so a security appears absent there when it was "
-                "only uncollected. Resampling the test awards to today's mix of routes gives the figures a "
-                "bidder should expect:")
+            add(f"Of the tenders open right now, {pct(share)} publish a security and take the precise "
+                "route; the rest fall to history. The archive is a poor guide to that split, because "
+                "its detail pages were mostly never fetched, so a security looks absent there when it "
+                "was only uncollected. Weighting the two measured routes by the split the site "
+                "actually serves:")
             add("")
-            add("| Measure | Value |")
-            add("|---|---|")
-            add(f"| Median error of the central estimate | {pct(aw.get('expected_mape_on_open_tenders'))} |")
-            add(f"| Share of awards inside the band | {pct(aw.get('expected_coverage_on_open_tenders'))} |")
-            add(f"| Typical band, high over low | {num(aw.get('expected_band_width_on_open_tenders'))}x |")
+            add("| Route | Share of open tenders | Median error | Typical band |")
+            add("|---|---|---|---|")
+            add(f"| From the tender security | {pct(share)} | {pct(aw.get('security_mape'))} | {num(aw.get('security_band_width_median'))}x |")
+            add(f"| From entity history | {pct(1 - share)} | {pct(aw.get('history_mape'))} | {num(aw.get('history_band_width_median'))}x |")
             add("")
-            add("This is a projection onto a different population, not a fourth measurement. Every number in "
-                "it comes from held-out awards; only the proportions are changed, and they are changed to "
-                "match what the site serves.")
+            add("Four tenders in five get the precise answer. That is a property of what the portal "
+                "publishes, not of the model, and it is the single most valuable thing found in this "
+                "project. Nothing here is an average of the two rows: each is measured on its own "
+                "held-out window and reported as itself.")
             add("")
-        add(f"Across the test window as crawled, the median error is {pct(aw.get('mape_acted'))} and the typical band is "
+
+        add(f"Taking the test window exactly as crawled, with whatever mix of routes it happens to "
+            f"contain, the median error is {pct(aw.get('mape_acted'))} and the typical band is "
             f"{num(aw.get('band_width_median'))}x wide. For scale, the spread between the 10th and 90th "
             f"percentile of all awards is {num(aw.get('unconditional_spread'), 0)}x, which is the band "
             "someone would quote knowing nothing at all. Simply guessing the median award for every "
             f"tender gives a median error of {pct(aw.get('mape_naive_median'))}.")
         add("")
+        by_method = aw.get("history_by_method") or {}
+        if by_method:
+            add("### The history route is not one number")
+            add("")
+            add("Open tendering is the hardest method to price and the one the history route is "
+                "mostly asked about, because a large open tender is exactly the kind that publishes "
+                "no security. Quoting a single history figure would hide that, so here is each "
+                "method on its own.")
+            add("")
+            add("| Method | Tenders answered | Median error | Inside the band | Typical band | Declined |")
+            add("|---|---|---|---|---|---|")
+            for name, v in by_method.items():
+                add(f"| {name} | {v['n_acted']:,} | {pct(v['mape'])} | {pct(v['coverage_80'])} | "
+                    f"{num(v['band_width_median'])}x | {pct(v['deferral_rate'])} |")
+            add("")
+
         limits = aw.get("deferral_at_band_limit") or {}
         if limits:
             add("Bidefy declines when a band would be too wide to act on. Where that line is drawn is "
@@ -137,6 +171,16 @@ def main() -> None:
         add(f"| Deferral needed to reach 93 percent | {pct(cat.get('deferral_for_93'))} |")
         add(f"| Deferral needed to reach 95 percent | {pct(cat.get('deferral_for_95'))} |")
         add("")
+        if cat.get("repeats", 1) > 1:
+            add(f"This model is not deterministic. Run the same cross-validation again, on the same "
+                f"data with the same seed, and the share it declines moves by up to "
+                f"{pct(cat.get('deferral_spread'))} and its macro F1 by "
+                f"{num(cat.get('macro_f1_spread'), 3)}. That is the floor below which a change to "
+                f"this model cannot be distinguished from chance, and it is published here because a "
+                f"figure quoted without it invites reading an improvement into noise. The numbers "
+                f"above pool {cat.get('repeats')} runs, which is why they are steadier than any one of them.")
+            add("")
+
         dropped = cat.get("classes_dropped_for_sparsity") or []
         if dropped:
             add(f"Categories held back for want of examples: {', '.join(dropped)}. They return once the "

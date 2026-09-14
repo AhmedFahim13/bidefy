@@ -11,14 +11,14 @@ phases:
       - {id: w1-checkpoint, title: "Checkpoint and Parquet store", owner: claude, state: done, weight: 2}
       - {id: w1-session, title: "Session, rate limiter, crawl policy", owner: claude, state: done, weight: 3}
       - {id: w1-workflow, title: "Nightly crawl workflow", owner: claude, state: done, weight: 2}
-      - {id: w1-backfill, title: "Full tender index backfilled", owner: claude, state: doing, weight: 3, note: "Runs across nights; see checkpoint"}
+      - {id: w1-backfill, title: "Full tender index backfilled", owner: claude, state: doing, weight: 3, note: "Page 48 of 3129. Portal serves about 10 pages a minute, so the remainder is roughly 5 hours of crawling and belongs to the nightly job"}
       - {id: w1-centre, title: "Command centre on GitHub Pages", owner: claude, state: done, weight: 2}
       - {id: w1-cloudflare, title: "Create Cloudflare account and run wrangler login", owner: fahim, state: done, weight: 1}
       - {id: w1-terms, title: "Read e-GP terms and disclaimer pages once", owner: fahim, state: done, weight: 1}
   - id: w2
     name: "Week 2: contracts, entity resolution, D1, Worker skeleton"
     tasks:
-      - {id: w2-contracts, title: "Contracts index backfilled", owner: claude, state: doing, weight: 3, note: "210,674 awards in; 1,054 of 4,387 pages done, continues nightly"}
+      - {id: w2-contracts, title: "Contracts index backfilled", owner: claude, state: doing, weight: 3, note: "Page 2869 of 4389. About 2.5 hours of crawling left at the portal's observed rate"}
       - {id: w2-resolve, title: "Entity resolution with review queue", owner: claude, state: done, weight: 4}
       - {id: w2-d1, title: "D1 schema and nightly load within write limits", owner: claude, state: done, weight: 3}
       - {id: w2-worker, title: "Worker skeleton with Hono", owner: claude, state: done, weight: 2}

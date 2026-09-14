@@ -118,6 +118,21 @@ def label_from_tags(tags: list[str]) -> str | None:
     return None
 
 
+def label_margin(tags: list[str]) -> int:
+    """How decisively the tag list picked its category: the winner's hits minus the runner-up's.
+
+    The portal's tags are themselves noisy, so a label that won by one keyword against a close
+    second is weaker evidence than one that won by four. This lets a caller train on the firm
+    labels while still being scored on all of them.
+    """
+    text = " ".join(t.lower() for t in tags if t)
+    scores = _hits(text, TAG_KEYWORDS) if text.strip() else {}
+    if not scores:
+        return 0
+    ranked = sorted(scores.values(), reverse=True)
+    return ranked[0] - (ranked[1] if len(ranked) > 1 else 0)
+
+
 def label_from_title(title: str) -> str | None:
     """Keyword fallback on the title alone; needs exactly one leading category."""
     text = " " + re.sub(r"\s+", " ", (title or "").lower()) + " "

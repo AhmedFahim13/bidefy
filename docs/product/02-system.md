@@ -22,6 +22,7 @@ Every current figure lives on its own page, [What Bidefy gets right, and how oft
 - An award band built from the tender security published in the notice lands within about 8 percent of the real award value. A band built from the entity's history alone is far looser.
 - A tender's category is read from the portal's own tags for every live tender, so on the live site it is not a prediction at all. The classifier only covers the archive.
 - Both models may decline, and the deferral rate is always printed beside the accuracy.
+- The history band is two quantile models with a conformal pad, not one estimate stretched by a difficulty score. That change alone raised coverage and cut the share of tenders declined, without moving any threshold. [What was tried, and what the measurements said](06-experiments.md) has the before and after.
 
 ## Two lessons worth keeping
 

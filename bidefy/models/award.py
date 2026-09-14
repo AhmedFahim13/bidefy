@@ -9,9 +9,13 @@ Route 2, the history route, for tenders with no published security. A LightGBM m
 entity, ministry, method, district, category and the title (both as quantity signals and as a
 stacked text prediction) predicts the log award value.
 
-Both routes carry split-conformal bands calibrated on held-out slices, so the stated coverage is
-honest by construction. The history route normalises its band by a predicted difficulty, so an
-easy tender gets a narrow band and a hard one a wide band or a deferral.
+Both routes carry conformal bands calibrated on held-out slices, so the stated coverage is honest
+by construction. The history route fits one model to the low edge of the band and one to the high
+edge, then pads both by a margin measured on rows neither model has seen. Two edges that can move
+independently beat one central estimate stretched by a predicted difficulty, which assumes every
+tender's error has the same shape: an easy tender gets a narrow band and a hard one a wide band or
+a deferral, and a tender with a firm floor and a long tail above it gets that too. The older
+difficulty-scaled route is still here, behind BAND_METHOD, because the comparison is in the docs.
 
 Everything is ordered by signing date: fitted on the oldest rows, calibrated on the middle,
 evaluated on the newest. Nothing is fitted on data later than what it predicts.
@@ -44,9 +48,12 @@ MIN_SECURITY_ROWS = 60
 MIN_GROUP_ROWS = 40
 DEFER_RATIO = 12.0         # wider than this and the band rules out too little to be worth showing
 MIN_ENTITY_HISTORY = 3
-MIN_METHOD_ROWS = 300      # below this a method borrows the shared quantiles
+MIN_METHOD_ROWS = 300      # below this a group borrows the shared quantiles
+CONFORMAL_GROUPS = ("method",)   # what the band is calibrated separately for
 COVERAGE = 0.80
-BUNDLE_FORMAT = 2          # bump when the saved bundle gains or loses a key
+BUNDLE_FORMAT = 3          # bump when the saved bundle gains or loses a key
+BAND_METHOD = "cqr"  # "normalised": one median model, band scaled by predicted difficulty.
+                            # "cqr": two quantile models, conformalised. See _cqr_scores.
 YEAR0 = 2020
 TAKA_PER_LAKH = 100_000.0
 UNIT_RE = re.compile(r"\b(km|kilometer|metre|meter|mtr|nos?|pcs|piece|set|sets|ton|mt|litre|liter|ltr|kg|unit|packet|bag|sqm|sft|cft|rft)\b", re.I)
@@ -70,8 +77,51 @@ def title_numerics(titles: pd.Series) -> pd.DataFrame:
     }, index=titles.index)
 
 
-NUM_COLS = ["month", "year_offset", "title_len", "title_words", "n_numbers", "max_number",
-            "sum_number", "has_unit", "has_year_range", "txt", "pe_history"]
+BASE_NUM_COLS = ["month", "year_offset", "title_len", "title_words", "n_numbers", "max_number",
+                 "sum_number", "has_unit", "has_year_range", "txt", "pe_history"]
+PRIOR_COLS = ["pe_prior", "pe_method_prior"]
+USE_ENTITY_PRIORS = True   # what this buyer has paid before, counting only earlier awards
+
+
+def _num_cols() -> list[str]:
+    return BASE_NUM_COLS + (PRIOR_COLS if USE_ENTITY_PRIORS else [])
+
+
+def _expanding_prior(pdf: pd.DataFrame, keys: list[str], smooth: float = 5.0) -> np.ndarray:
+    """The average log award this buyer had signed before this row, for rows sorted by date.
+
+    A buyer's past is the strongest thing a bidder knows about it, and the tree can only reach it
+    through the entity id, which it has to learn level by level from whatever rows it happens to
+    see. Handing it the running average directly is the same evidence in a usable shape. Only
+    earlier awards count, so no row is ever informed by its own outcome or by a later one.
+    """
+    y = pdf["y"].to_numpy(dtype=float)
+    grand = float(np.mean(y)) if len(y) else 0.0
+    g = pdf.groupby(keys, observed=True)["y"]
+    earlier_sum = g.cumsum().to_numpy() - y
+    earlier_n = g.cumcount().to_numpy()
+    return (earlier_sum + smooth * grand) / (earlier_n + smooth)
+
+
+def _prior_tables(pdf: pd.DataFrame) -> dict:
+    """The same averages over all of history, for scoring a tender that has not happened yet."""
+    grand = float(pdf["y"].mean())
+    return {
+        "grand": grand,
+        "pe": pdf.groupby("pe_id", observed=True)["y"].mean().to_dict(),
+        "pe_method": {f"{a}|{b}": v for (a, b), v in
+                      pdf.groupby(["pe_id", "method"], observed=True)["y"].mean().to_dict().items()},
+    }
+
+
+def _apply_priors(df: pd.DataFrame, tables: dict) -> pd.DataFrame:
+    grand = tables.get("grand", 0.0)
+    pe = df["pe_id"].astype(str).map(tables.get("pe", {}))
+    key = df["pe_id"].astype(str) + "|" + df["method"].astype(str)
+    pm = key.map(tables.get("pe_method", {}))
+    df["pe_prior"] = pe.fillna(grand).to_numpy()
+    df["pe_method_prior"] = pm.fillna(pe).fillna(grand).to_numpy()
+    return df
 
 
 def _prepare(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
@@ -88,11 +138,11 @@ def _prepare(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
     return df
 
 
-def _matrix(df: pd.DataFrame, levels: dict[str, list[str]]) -> pd.DataFrame:
+def _matrix(df: pd.DataFrame, levels: dict[str, list[str]], cols: list[str] | None = None) -> pd.DataFrame:
     out = pd.DataFrame(index=df.index)
     for c in CAT_COLS:
         out[c] = pd.Categorical(df[c].where(df[c] != "", None), categories=levels[c])
-    for c in NUM_COLS:
+    for c in (cols or _num_cols()):
         out[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
     return out
 
@@ -137,9 +187,59 @@ def _security_log_multiple(model: dict, methods: np.ndarray) -> np.ndarray:
     return np.array([model["by_method"].get(str(m), model["global"]) for m in methods])
 
 
-def _method_quantiles(methods: np.ndarray, by_method: dict, lo: float, hi: float):
-    """Per-method conformal quantiles, falling back to the shared pair."""
-    pairs = [by_method.get(str(m), (lo, hi)) for m in methods]
+def _group_keys(df: pd.DataFrame, predicted: np.ndarray | None = None,
+                size_edges: list[float] | None = None) -> np.ndarray:
+    """The label a row's band is calibrated under: its method, optionally with its size band.
+
+    Size matters because a small purchase and a large one are not equally predictable, and one
+    shared quantile serves neither well. Bucket edges are fixed when the model is trained and
+    carried in the bundle, so a row falls in the same bucket whatever else it is predicted beside.
+    """
+    parts = []
+    for col in CONFORMAL_GROUPS:
+        if col == "size":
+            if predicted is None or not size_edges:
+                parts.append(np.zeros(len(df), dtype=int).astype(str))
+            else:
+                parts.append(np.digitize(predicted, size_edges).astype(str))
+        else:
+            parts.append(df[col].astype(str).to_numpy())
+    return np.array(["|".join(vals) for vals in zip(*parts)])
+
+
+def _fit_quantile_pair(frame: pd.DataFrame, levels: dict, seed: int):
+    """A model for the low edge of the band and one for the high edge.
+
+    Scaling one median prediction by a predicted difficulty assumes every tender's error spreads
+    the same shape, only wider or narrower. Real awards are not like that: a tender can have a
+    firm floor and a long tail above it. Two quantile models can learn an edge each.
+    """
+    X, y = _matrix(frame, levels), frame["y"]
+    make = lambda a: lgb.LGBMRegressor(objective="quantile", alpha=a, random_state=seed, **PARAMS).fit(X, y)
+    return make(LO_Q), make(HI_Q)
+
+
+def _cqr_scores(lo_pred: np.ndarray, hi_pred: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """How far outside its own band each row fell; negative when the band had room to spare."""
+    return np.maximum(lo_pred - y, y - hi_pred)
+
+
+def _conformal_pad(scores: np.ndarray) -> float:
+    """The margin that must be added to both edges for the stated share of rows to land inside.
+
+    The finite-sample correction matters: with a few hundred rows, taking the plain 80th
+    percentile leaves coverage a little short of 80 percent every time.
+    """
+    n = len(scores)
+    if n == 0:
+        return 0.0
+    level = min(np.ceil((n + 1) * COVERAGE) / n, 1.0)
+    return float(np.quantile(scores, level))
+
+
+def _method_quantiles(keys: np.ndarray, by_group: dict, lo: float, hi: float):
+    """Per-group conformal quantiles, falling back to the shared pair."""
+    pairs = [by_group.get(str(k), (lo, hi)) for k in keys]
     return np.array([q[0] for q in pairs]), np.array([q[1] for q in pairs])
 
 
@@ -170,6 +270,29 @@ def live_security_share(data_root: Path) -> float | None:
                  t["security_bdt"].is_not_null().mean())
 
 
+def live_method_mix(data_root: Path) -> dict[str, float]:
+    """How open tenders that have no published security split across procurement methods.
+
+    These are the tenders the history route has to price, and they are not the historical mix:
+    open tendering dominates them, and open tendering is the hardest method to price. Ignoring
+    that made the projected figures flattering.
+    """
+    path = Path(data_root) / "clean" / "tenders.parquet"
+    if not path.exists():
+        return {}
+    t = pl.read_parquet(path)
+    if "status" in t.columns:
+        t = t.filter(pl.col("status") == "Live")
+    if t.is_empty() or "method" not in t.columns:
+        return {}
+    t = _join_security(t, Path(data_root)).filter(pl.col("security_bdt").is_null())
+    if t.is_empty():
+        return {}
+    counts = t.group_by("method").len()
+    total = int(counts["len"].sum())
+    return {str(m): n / total for m, n in counts.iter_rows() if m}
+
+
 def _load_awards(data_root: Path) -> pd.DataFrame:
     path = Path(data_root) / "clean" / "contracts.parquet"
     if not path.exists():
@@ -187,6 +310,8 @@ def _load_awards(data_root: Path) -> pd.DataFrame:
     # difficulty model when a tender comes from an entity it barely knows, so the band can widen
     # instead of quietly being wrong.
     pdf["pe_history"] = np.log1p(pdf.groupby("pe_id").cumcount())
+    pdf["pe_prior"] = _expanding_prior(pdf, ["pe_id"])
+    pdf["pe_method_prior"] = _expanding_prior(pdf, ["pe_id", "method"])
     return pdf
 
 
@@ -208,6 +333,88 @@ def _join_security(df: pl.DataFrame, data_root: Path) -> pl.DataFrame:
 
 
 # --------------------------------------------------------------------------- training
+
+def _calibrate_cqr(past: pd.DataFrame, levels: dict, calib: pd.DataFrame,
+                   oof_lo: np.ndarray, oof_hi: np.ndarray, a: int, b: int, seed: int) -> dict:
+    """Pad the two quantile models' band until it covers, per method, then check it against drift.
+
+    The rows are split exactly as the difficulty route splits them, so the two band methods are
+    calibrated on the same evidence and the comparison between them is about the method alone.
+    """
+    q_rows, check_rows = calib.iloc[a:b], calib.iloc[b:]
+    q_y, check_y = q_rows["y"].to_numpy(), check_rows["y"].to_numpy()
+    q_score = _cqr_scores(oof_lo[a:b], oof_hi[a:b], q_y)
+    pad = _conformal_pad(q_score)
+
+    keys = _group_keys(q_rows)
+    by_method = {str(k): _conformal_pad(q_score[keys == k]) for k in set(keys)
+                 if k and (keys == k).sum() >= MIN_METHOD_ROWS}
+
+    # Quantiles fitted on one period under-cover the next. Measure the shortfall on a later block
+    # these pads have not seen and widen each one just enough. Still only past data.
+    drift = 0.0
+    if len(check_rows) >= 200:
+        check_score = _cqr_scores(oof_lo[b:], oof_hi[b:], check_y)
+        check_keys = _group_keys(check_rows)
+
+        def _extra(mask: np.ndarray, base: float) -> float:
+            if mask.sum() < MIN_METHOD_ROWS:
+                return 0.0
+            sc = check_score[mask]
+            for step in np.arange(0.0, 2.02, 0.02):
+                if (sc <= base + step).mean() >= COVERAGE:
+                    return float(step)
+            return 2.0
+
+        drift = _extra(np.ones(len(check_rows), dtype=bool), pad)
+        by_method = {k: v + _extra(check_keys == k, v) for k, v in by_method.items()}
+    pad += drift
+
+    lo_model, hi_model = _fit_quantile_pair(past, levels, seed)
+    return {"lo_model": lo_model, "hi_model": hi_model, "pad": pad, "by_method": by_method,
+            "drift_pad": round(drift, 3)}
+
+
+def _evaluate_security_route(pdf: pd.DataFrame) -> dict:
+    """Score the security route on its own timeline, fitted on earlier securities only.
+
+    The archive reaches back to 2019 but detail pages have only been fetched for the last year, so
+    every published security we hold is recent. Split the whole archive at eighty percent and every
+    one of them lands on the test side, leaving the multiplier nothing to learn from and the route
+    silently switched off. That is a fact about what has been crawled, not about the method.
+
+    So the route gets its own split, at eighty percent of the securities by date: fitted on the
+    earlier ones, scored on the later ones. It is a smaller and more recent window than the history
+    route's, which is why it is reported separately and never folded into a single headline.
+    """
+    rows = pdf[_has_security(pdf)].sort_values("signed_on")
+    out = {"security_route_n_total": int(len(rows))}
+    if len(rows) < 2 * MIN_SECURITY_ROWS:
+        return out
+    cut = str(rows["signed_on"].iloc[int(len(rows) * 0.80)])
+    earlier, later = rows[rows["signed_on"].astype(str) < cut], rows[rows["signed_on"].astype(str) >= cut]
+    model = _fit_security(earlier)
+    if model is None or len(later) < 30:
+        return out
+    ratio = (np.log(earlier["lakh"].to_numpy() * TAKA_PER_LAKH / pd.to_numeric(earlier["security_bdt"]).to_numpy())
+             - _security_log_multiple(model, earlier["method"].to_numpy()))
+    lo, hi = float(np.quantile(ratio, LO_Q)), float(np.quantile(ratio, HI_Q))
+    sec_lakh = pd.to_numeric(later["security_bdt"], errors="coerce").to_numpy() / TAKA_PER_LAKH
+    centre = np.log(sec_lakh) + _security_log_multiple(model, later["method"].to_numpy())
+    q50, q10, q90 = np.exp(centre), np.exp(centre + lo), np.exp(centre + hi)
+    actual = later["lakh"].to_numpy()
+    ok = np.isfinite(q50) & (actual > 0)
+    inside = (actual >= q10) & (actual <= q90)
+    out.update({
+        "security_n": int(ok.sum()),
+        "security_fitted_on": int(len(earlier)),
+        "security_test_from": cut,
+        "security_mape": round(float(np.median(np.abs(q50[ok] - actual[ok]) / actual[ok])), 4),
+        "security_coverage_80": round(float(inside[ok].mean()), 4),
+        "security_band_width_median": round(float(np.median(q90[ok] / np.maximum(q10[ok], 1e-9))), 2),
+    })
+    return out
+
 
 def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     pdf = _load_awards(Path(data_root))
@@ -231,7 +438,7 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     # drift included, and there are tens of thousands of them rather than a few thousand.
     fractions = (0.4, 0.55, 0.70, 0.85, 1.0) if len(past) >= MIN_FOR_WALK else (0.8, 1.0)
     edges = [int(len(past) * f) for f in fractions]
-    oof_index, oof_resid = [], []
+    oof_index, oof_resid, oof_lo, oof_hi = [], [], [], []
     start = edges[0]
     for end in edges[1:]:
         block = past.iloc[start:end]
@@ -243,6 +450,10 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
             _matrix(prior, levels), prior["y"])
         oof_index.append(block.index.to_numpy())
         oof_resid.append(block["y"].to_numpy() - step.predict(_matrix(block, levels)))
+        if BAND_METHOD == "cqr":
+            lo_m, hi_m = _fit_quantile_pair(prior, levels, seed)
+            oof_lo.append(lo_m.predict(_matrix(block, levels)))
+            oof_hi.append(hi_m.predict(_matrix(block, levels)))
         start = end
     idx = np.concatenate(oof_index)
     resid = np.concatenate(oof_resid)
@@ -266,7 +477,9 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     # far more variable than a quick quote, so a shared band under-covers open tenders and wastes
     # width on the rest. Give each method its own quantiles where there is enough history.
     by_method: dict[str, tuple[float, float]] = {}
-    methods = q_rows["method"].to_numpy()
+    q_pred = model.predict(_matrix(q_rows, levels))
+    size_edges = [float(v) for v in np.quantile(q_pred, [0.2, 0.4, 0.6, 0.8])] if "size" in CONFORMAL_GROUPS else []
+    methods = _group_keys(q_rows, q_pred, size_edges)
     for name in set(methods):
         mask = methods == name
         if name and mask.sum() >= MIN_METHOD_ROWS:
@@ -282,7 +495,7 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     drift = 1.0
     if len(check_rows) >= 200:
         check_scale = np.maximum(difficulty.predict(_matrix(check_rows, levels)), floor)
-        check_methods = check_rows["method"].to_numpy()
+        check_methods = _group_keys(check_rows, model.predict(_matrix(check_rows, levels)), size_edges)
 
         def _widen(mask: np.ndarray, lo: float, hi: float) -> float:
             if mask.sum() < MIN_METHOD_ROWS:
@@ -301,26 +514,41 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
         by_method = widened
     lo_q, hi_q = lo_q * drift, hi_q * drift
 
-    sec_model = _fit_security(past)
+    cqr: dict = {}
+    if BAND_METHOD == "cqr":
+        cqr = _calibrate_cqr(past, levels, calib, np.concatenate(oof_lo), np.concatenate(oof_hi), a, b, seed)
+
+    # For serving, the multiplier learns from every security in the archive, which is what the
+    # nightly retrain would do. The figures published for this route come from the separate,
+    # earlier-only fit in _evaluate_security_route, never from this one.
+    sec_model = _fit_security(past) or _fit_security(pdf)
     sec_lo = sec_hi = 0.0
     if sec_model:
-        with_sec = past[_has_security(past)]
+        with_sec = (past if _has_security(past).sum() >= MIN_SECURITY_ROWS else pdf)
+        with_sec = with_sec[_has_security(with_sec)]
         ratio = (np.log(with_sec["lakh"].to_numpy() * TAKA_PER_LAKH / pd.to_numeric(with_sec["security_bdt"]).to_numpy())
                  - _security_log_multiple(sec_model, with_sec["method"].to_numpy()))
         sec_lo, sec_hi = float(np.quantile(ratio, LO_Q)), float(np.quantile(ratio, HI_Q))
 
     bundle = {
         "model": model, "difficulty": difficulty, "levels": levels, "vectorizer": vec, "ridge": ridge,
-        "lo_q": lo_q, "hi_q": hi_q, "floor": floor, "by_method": by_method,
+        "lo_q": lo_q, "hi_q": hi_q, "floor": floor, "by_method": by_method, "size_edges": size_edges,
         "security": sec_model, "security_lo": sec_lo, "security_hi": sec_hi,
+        "band_method": BAND_METHOD, "cqr": cqr,
+        "num_cols": _num_cols(), "priors": _prior_tables(past) if USE_ENTITY_PRIORS else {},
         "history": past.groupby("pe_id").size().to_dict(),
         "format": BUNDLE_FORMAT,
         "version": datetime.now(timezone.utc).strftime("award-%Y%m%d"),
         "coverage_target": COVERAGE,
-        "drift_allowance": round(drift, 3),
+        "drift_allowance": cqr.get("drift_pad", round(drift, 3)),
     }
-    metrics = _evaluate(bundle, test, live_security_share(Path(data_root)))
-    metrics.update({"drift_allowance": round(drift, 3), "n_fit": len(past), "n_calibration": len(calib), "n_test": len(test),
+    metrics = _evaluate(bundle, test, live_security_share(Path(data_root)), live_method_mix(Path(data_root)))
+    sec_metrics = _evaluate_security_route(pdf)
+    sec_metrics["live_security_share"] = live_security_share(Path(data_root))
+    metrics = {k: v for k, v in metrics.items()
+               if not (k.startswith("security_") and sec_metrics.get("security_n"))}
+    metrics.update(sec_metrics)
+    metrics.update({"drift_allowance": cqr.get("drift_pad", round(drift, 3)), "n_fit": len(past), "n_calibration": len(calib), "n_test": len(test),
                     "test_from": str(test["signed_on"].iloc[0]),
                     "train_last_signed": str(past["signed_on"].iloc[-1]),
                     "trained_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -336,7 +564,8 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     return metrics
 
 
-def _evaluate(bundle: dict, test: pd.DataFrame, live_share: float | None = None) -> dict:
+def _evaluate(bundle: dict, test: pd.DataFrame, live_share: float | None = None,
+              method_mix: dict[str, float] | None = None) -> dict:
     pred = predict(test, bundle, date_col="signed_on", already_prepared=True)
     q10 = pred["q10_lakh"].to_numpy()
     q50 = pred["q50_lakh"].to_numpy()
@@ -387,6 +616,26 @@ def _evaluate(bundle: dict, test: pd.DataFrame, live_share: float | None = None)
             out[f"{name}_mape_ci95"] = ci(errs, lambda v: float(np.median(v)))
             out[f"{name}_coverage_ci95"] = ci(inside[m].astype(float), lambda v: float(v.mean()))
 
+    # The history route is not one thing. Open tendering is far harder to price than a quotation,
+    # and open tendering is nearly all of what the route is actually asked to price on the live
+    # site, so a single history figure hides the number that matters.
+    if "method" in test.columns:
+        methods = test["method"].astype(str).to_numpy()
+        by_method = {}
+        for name in pd.unique(methods):
+            seen = (basis == "history") & (methods == name)
+            m = acted & seen
+            if seen.sum() < 200 or m.sum() < 100:
+                continue
+            by_method[str(name)] = {
+                "n_acted": int(m.sum()),
+                "mape": ape(q50, m),
+                "coverage_80": round(float(inside[m].mean()), 4),
+                "band_width_median": round(float(np.median(ratio[m])), 2),
+                "deferral_rate": round(float((deferred & seen).sum() / seen.sum()), 4),
+            }
+        out["history_by_method"] = dict(sorted(by_method.items(), key=lambda kv: -kv[1]["n_acted"]))
+
     # What a user actually meets. The test window's security coverage reflects how much of it has
     # been crawled, not how many notices publish a security, so resample the test rows to the mix
     # of routes seen on open tenders today and measure that.
@@ -395,8 +644,23 @@ def _evaluate(bundle: dict, test: pd.DataFrame, live_share: float | None = None)
     if live_share is not None and len(sec_rows) >= 30 and len(hist_rows) >= 30:
         rng = np.random.default_rng(0)
         n_draw = min(len(hist_rows) * 2, 20_000)
-        pick = np.where(rng.random(n_draw) < live_share,
-                        rng.choice(sec_rows, n_draw), rng.choice(hist_rows, n_draw))
+        # Draw the history rows to match the methods that open tenders without a security actually
+        # use, not the methods the archive happens to hold.
+        if method_mix:
+            methods = test["method"].astype(str).to_numpy()
+            pools = {m: hist_rows[methods[hist_rows] == m] for m in method_mix}
+            usable = {m: w for m, w in method_mix.items() if len(pools.get(m, [])) >= 30}
+            if usable:
+                total = sum(usable.values())
+                names = list(usable)
+                drawn = rng.choice(len(names), n_draw, p=[usable[m] / total for m in names])
+                hist_draw = np.array([rng.choice(pools[names[i]]) for i in drawn])
+                out["projection_method_mix"] = {m: round(w / total, 4) for m, w in usable.items()}
+            else:
+                hist_draw = rng.choice(hist_rows, n_draw)
+        else:
+            hist_draw = rng.choice(hist_rows, n_draw)
+        pick = np.where(rng.random(n_draw) < live_share, rng.choice(sec_rows, n_draw), hist_draw)
         out["live_security_share"] = round(float(live_share), 4)
         out["expected_mape_on_open_tenders"] = round(float(np.median(np.abs(q50[pick] - actual[pick]) / actual[pick])), 4)
         out["expected_coverage_on_open_tenders"] = round(float(inside[pick].mean()), 4)
@@ -429,13 +693,24 @@ def predict(rows, bundle: dict, date_col: str = "published_at", already_prepared
 
     if "pe_history" not in df.columns:
         df["pe_history"] = np.log1p(df["pe_id"].map(bundle["history"]).fillna(0).astype(float))
-    X = _matrix(df, bundle["levels"])
+    if bundle.get("priors") and "pe_prior" not in df.columns:
+        df = _apply_priors(df, bundle["priors"])
+    X = _matrix(df, bundle["levels"], bundle.get("num_cols"))
     p = bundle["model"].predict(X)
-    s = np.maximum(bundle["difficulty"].predict(X), bundle["floor"])
-    lo, hi = _method_quantiles(df["method"].to_numpy(), bundle.get("by_method", {}), bundle["lo_q"], bundle["hi_q"])
-    q10 = np.expm1(p + lo * s)
+    cqr = bundle.get("cqr") or {}
+    if bundle.get("band_method") == "cqr" and cqr:
+        keys = _group_keys(df)
+        pad = np.array([cqr["by_method"].get(str(k), cqr["pad"]) for k in keys])
+        low = cqr["lo_model"].predict(X) - pad
+        high = cqr["hi_model"].predict(X) + pad
+    else:
+        s_scale = np.maximum(bundle["difficulty"].predict(X), bundle["floor"])
+        lo, hi = _method_quantiles(_group_keys(df, p, bundle.get("size_edges")), bundle.get("by_method", {}),
+                                   bundle["lo_q"], bundle["hi_q"])
+        low, high = p + lo * s_scale, p + hi * s_scale
+    q10 = np.expm1(low)
     q50 = np.expm1(p)
-    q90 = np.expm1(p + hi * s)
+    q90 = np.expm1(high)
     basis = np.array(["history"] * len(df), dtype=object)
 
     sec_model = bundle.get("security")

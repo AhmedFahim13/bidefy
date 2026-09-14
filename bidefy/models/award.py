@@ -251,17 +251,31 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     # Quantiles taken from one period under-cover the next, because the world moves. Measure that
     # shortfall on a later block the quantiles have not seen, and widen just enough to close it.
     # Still only past data: no part of the test window is consulted.
+    # Quantiles taken from one period under-cover the next, and they do not under-cover every
+    # procurement method equally: open tendering drifts hardest. Measure the shortfall per method
+    # on a later block the quantiles have not seen, and widen each one just enough to close it.
+    # Still only past data: no part of the test window is consulted.
     drift = 1.0
     if len(check_rows) >= 200:
         check_scale = np.maximum(difficulty.predict(_matrix(check_rows, levels)), floor)
-        c_lo, c_hi = _method_quantiles(check_rows["method"].to_numpy(), by_method, lo_q, hi_q)
-        for k in np.arange(1.0, 2.55, 0.05):
-            covered = ((check_resid >= c_lo * k * check_scale) & (check_resid <= c_hi * k * check_scale)).mean()
-            drift = float(k)
-            if covered >= COVERAGE:
-                break
+        check_methods = check_rows["method"].to_numpy()
+
+        def _widen(mask: np.ndarray, lo: float, hi: float) -> float:
+            if mask.sum() < MIN_METHOD_ROWS:
+                return 1.0
+            r, sc = check_resid[mask], check_scale[mask]
+            for k in np.arange(1.0, 3.05, 0.05):
+                if ((r >= lo * k * sc) & (r <= hi * k * sc)).mean() >= COVERAGE:
+                    return float(k)
+            return 3.0
+
+        drift = _widen(np.ones(len(check_rows), dtype=bool), lo_q, hi_q)
+        widened = {}
+        for name, (lo, hi) in by_method.items():
+            k = _widen(check_methods == name, lo, hi)
+            widened[name] = (lo * k, hi * k)
+        by_method = widened
     lo_q, hi_q = lo_q * drift, hi_q * drift
-    by_method = {k: (lo * drift, hi * drift) for k, (lo, hi) in by_method.items()}
 
     sec_model = _fit_security(past)
     sec_lo = sec_hi = 0.0

@@ -10,3 +10,9 @@ worker/.wrangler/
 worker/.dev.vars
 worker/.vapid.json
 models/*.joblib
+
+# Clean tables are derived: every pipeline run rebuilds them from data/raw in a single step.
+# They were tracked, and a 55 MB parquet that does not delta-compress was being rewritten by
+# every nightly commit, adding that much to the repository each night. The raw parts are the
+# source of truth; anything that needs the clean tables builds them first.
+data/clean/

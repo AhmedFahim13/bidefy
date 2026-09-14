@@ -1,10 +1,10 @@
 {
   "endpoint": "tenders",
-  "next_page": 148,
+  "next_page": 248,
   "total_pages": 3131,
   "newest_id_seen": "",
   "mode": "backfill",
-  "updated_at": "2026-09-14T12:29:04Z",
+  "updated_at": "2026-09-14T12:34:18Z",
   "last_run_pages": 47,
   "last_run_rows": 9399,
   "last_run_status": "budget"

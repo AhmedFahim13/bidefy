@@ -66,10 +66,19 @@ jobs:
           echo "endpoint=$EP" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
       - name: Crawl
-        run: uv run python -m bidefy.crawler.run --endpoint "${{ steps.mode.outputs.endpoint }}" --mode "${{ steps.mode.outputs.mode }}" --budget-min "${INPUT_BUDGET:-240}"
+        run: uv run python -m bidefy.crawler.run --endpoint "${{ steps.mode.outputs.endpoint }}" --mode "${{ steps.mode.outputs.mode }}" --budget-min "${INPUT_BUDGET:-180}"
       - name: Fetch live tender details
         continue-on-error: true
-        run: uv run python -m bidefy.crawler.details --source live --n 1500 --budget-min 25 --interval 1.0
+        run: uv run python -m bidefy.crawler.details --source live --n 1500 --budget-min 20 --interval 1.0
+      # Detail pages for tenders that have already been awarded are what teach the model the link
+      # between the published security and the award value. Of the awards signed since the portal's
+      # detail pages stop being served, only a low single-digit percentage have been fetched, and
+      # about 85 percent of fetched pages publish a security. Each one turns a five-times-wide
+      # history band into a one-and-a-half-times security band, and adds a genuine category label.
+      # This is the highest-value crawling left, so it gets a budget of its own every night.
+      - name: Fetch details for awarded tenders
+        continue-on-error: true
+        run: uv run python -m bidefy.crawler.details --source contracts --signed-since 2025-09-01 --n 4000 --budget-min 60 --interval 1.0
       - name: Compact
         env:
           EP: ${{ steps.mode.outputs.endpoint }}

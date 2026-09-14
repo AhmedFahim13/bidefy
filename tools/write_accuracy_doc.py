@@ -76,7 +76,26 @@ def main() -> None:
         add(f"| Share of awards inside the band | {pct(aw.get('security_coverage_80'))} | {pct(aw.get('history_coverage_80'))} |")
         add(f"| Typical band, high over low | {num(aw.get('security_band_width_median'))}x | {num(aw.get('history_band_width_median'))}x |")
         add("")
-        add(f"Across both routes the median error is {pct(aw.get('mape_acted'))} and the typical band is "
+        if aw.get("live_security_share") is not None:
+            add("### What a bidder actually meets")
+            add("")
+            add(f"Of the tenders open right now, {pct(aw.get('live_security_share'))} publish a security and "
+                "take the precise route. The historical test window looks nothing like that, because its "
+                "detail pages have mostly never been fetched, so a security appears absent there when it was "
+                "only uncollected. Resampling the test awards to today's mix of routes gives the figures a "
+                "bidder should expect:")
+            add("")
+            add("| Measure | Value |")
+            add("|---|---|")
+            add(f"| Median error of the central estimate | {pct(aw.get('expected_mape_on_open_tenders'))} |")
+            add(f"| Share of awards inside the band | {pct(aw.get('expected_coverage_on_open_tenders'))} |")
+            add(f"| Typical band, high over low | {num(aw.get('expected_band_width_on_open_tenders'))}x |")
+            add("")
+            add("This is a projection onto a different population, not a fourth measurement. Every number in "
+                "it comes from held-out awards; only the proportions are changed, and they are changed to "
+                "match what the site serves.")
+            add("")
+        add(f"Across the test window as crawled, the median error is {pct(aw.get('mape_acted'))} and the typical band is "
             f"{num(aw.get('band_width_median'))}x wide. For scale, the spread between the 10th and 90th "
             f"percentile of all awards is {num(aw.get('unconditional_spread'), 0)}x, which is the band "
             "someone would quote knowing nothing at all. Simply guessing the median award for every "

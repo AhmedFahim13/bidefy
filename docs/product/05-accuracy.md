@@ -12,39 +12,49 @@ A tender notice publishes a refundable tender security. Buyers set it as a fixed
 
 | | From the tender security | From entity history |
 |---|---|---|
-| Tenders in the test set | 303 | 23,974 |
-| Median error of the central estimate | 7.7 percent | 34.2 percent |
-| Share of awards inside the band | 84.2 percent | 76.7 percent |
-| Typical band, high over low | 1.47x | 4.42x |
+| Tenders in the test set | 354 | 29,839 |
+| Median error of the central estimate | 8.3 percent | 36.8 percent |
+| Share of awards inside the band | 85.6 percent | 76.9 percent |
+| Typical band, high over low | 1.49x | 4.94x |
 
-Across both routes the median error is 33.7 percent and the typical band is 4.39x wide. For scale, the spread between the 10th and 90th percentile of all awards is 59x, which is the band someone would quote knowing nothing at all. Simply guessing the median award for every tender gives a median error of 78.0 percent.
+### What a bidder actually meets
+
+Of the tenders open right now, 80.0 percent publish a security and take the precise route. The historical test window looks nothing like that, because its detail pages have mostly never been fetched, so a security appears absent there when it was only uncollected. Resampling the test awards to today's mix of routes gives the figures a bidder should expect:
+
+| Measure | Value |
+|---|---|
+| Median error of the central estimate | 9.5 percent |
+| Share of awards inside the band | 84.0 percent |
+| Typical band, high over low | 1.49x |
+
+This is a projection onto a different population, not a fourth measurement. Every number in it comes from held-out awards; only the proportions are changed, and they are changed to match what the site serves.
+
+Across the test window as crawled, the median error is 36.4 percent and the typical band is 4.9x wide. For scale, the spread between the 10th and 90th percentile of all awards is 59x, which is the band someone would quote knowing nothing at all. Simply guessing the median award for every tender gives a median error of 78.0 percent.
 
 Bidefy declines when a band would be too wide to act on. Where that line is drawn is a product decision, not a statistical one, so here is the whole trade:
 
 | Widest band shown | Tenders declined |
 |---|---|
-| 4x | 75.3 percent |
-| 6x | 54.4 percent |
-| 8x | 40.6 percent |
-| 12x | 26.5 percent |
-| 20x | 13.5 percent |
+| 4x | 74.3 percent |
+| 6x | 52.7 percent |
+| 8x | 39.1 percent |
+| 12x | 25.5 percent |
+| 20x | 12.9 percent |
 
 ## Category
 
 A tender's category is read from the portal's own tags wherever Bidefy has fetched that tender's detail page. The model below exists only to cover tenders whose detail page has not been fetched, mostly older archived ones.
 
-Trained and scored on 1,942 tenders across 14 categories, cross-validated on portal category tags only.
+Trained and scored on 4,439 tenders across 15 categories, cross-validated on portal category tags only, entity priors from the training fold.
 
 | Measure | Value |
 |---|---|
-| Accuracy on the predictions it commits to | 89.8 percent |
-| Share of tenders it declines | 37.1 percent |
-| Accuracy if forced to answer every time | 74.1 percent |
-| Macro F1 across categories | 0.564 |
-| Deferral needed to reach 93 percent | 52.1 percent |
-| Deferral needed to reach 95 percent | 58.2 percent |
-
-Categories held back for want of examples: water_sanitation. They return once the detail crawl has collected enough of them.
+| Accuracy on the predictions it commits to | 93.0 percent |
+| Share of tenders it declines | 40.1 percent |
+| Accuracy if forced to answer every time | 75.1 percent |
+| Macro F1 across categories | 0.632 |
+| Deferral needed to reach 93 percent | 40.1 percent |
+| Deferral needed to reach 95 percent | 46.1 percent |
 
 ## What would move these numbers
 

@@ -151,6 +151,25 @@ def _has_security(df: pd.DataFrame) -> np.ndarray:
 
 # --------------------------------------------------------------------------- loading
 
+def live_security_share(data_root: Path) -> float | None:
+    """Share of open tenders whose notice publishes a security, so they take the precise route.
+
+    The historical test window is a poor guide to this: its detail pages have mostly not been
+    fetched, so security looks absent there when in truth it was simply never collected.
+    """
+    path = Path(data_root) / "clean" / "tenders.parquet"
+    if not path.exists():
+        return None
+    t = pl.read_parquet(path)
+    if "status" in t.columns:
+        t = t.filter(pl.col("status") == "Live")
+    if t.is_empty():
+        return None
+    t = _join_security(t, Path(data_root))
+    return float((pl.col("security_bdt").is_not_null().sum() / t.height) if False else
+                 t["security_bdt"].is_not_null().mean())
+
+
 def _load_awards(data_root: Path) -> pd.DataFrame:
     path = Path(data_root) / "clean" / "contracts.parquet"
     if not path.exists():
@@ -295,7 +314,7 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
         "coverage_target": COVERAGE,
         "drift_allowance": round(drift, 3),
     }
-    metrics = _evaluate(bundle, test)
+    metrics = _evaluate(bundle, test, live_security_share(Path(data_root)))
     metrics.update({"drift_allowance": round(drift, 3), "n_fit": len(past), "n_calibration": len(calib), "n_test": len(test),
                     "test_from": str(test["signed_on"].iloc[0]),
                     "trained_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -311,7 +330,7 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     return metrics
 
 
-def _evaluate(bundle: dict, test: pd.DataFrame) -> dict:
+def _evaluate(bundle: dict, test: pd.DataFrame, live_share: float | None = None) -> dict:
     pred = predict(test, bundle, date_col="signed_on", already_prepared=True)
     q10 = pred["q10_lakh"].to_numpy()
     q50 = pred["q50_lakh"].to_numpy()
@@ -347,6 +366,21 @@ def _evaluate(bundle: dict, test: pd.DataFrame) -> dict:
             out[f"{name}_mape"] = ape(q50, m)
             out[f"{name}_coverage_80"] = round(float(inside[m].mean()), 4)
             out[f"{name}_band_width_median"] = round(float(np.median(ratio[m])), 2)
+
+    # What a user actually meets. The test window's security coverage reflects how much of it has
+    # been crawled, not how many notices publish a security, so resample the test rows to the mix
+    # of routes seen on open tenders today and measure that.
+    sec_rows = np.where(acted & (basis == "security"))[0]
+    hist_rows = np.where(acted & (basis == "history"))[0]
+    if live_share is not None and len(sec_rows) >= 30 and len(hist_rows) >= 30:
+        rng = np.random.default_rng(0)
+        n_draw = min(len(hist_rows) * 2, 20_000)
+        pick = np.where(rng.random(n_draw) < live_share,
+                        rng.choice(sec_rows, n_draw), rng.choice(hist_rows, n_draw))
+        out["live_security_share"] = round(float(live_share), 4)
+        out["expected_mape_on_open_tenders"] = round(float(np.median(np.abs(q50[pick] - actual[pick]) / actual[pick])), 4)
+        out["expected_coverage_on_open_tenders"] = round(float(inside[pick].mean()), 4)
+        out["expected_band_width_on_open_tenders"] = round(float(np.median(ratio[pick])), 2)
     return out
 
 

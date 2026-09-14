@@ -97,6 +97,7 @@ def main(argv: list[str] | None = None) -> int:
                          "the strongest predictor of the award value, so the band depends on it. "
                          "contracts gives detail pages for awarded tenders, which is how the model learns the link.")
     ap.add_argument("--since", default="", help="only ids advertised or published on or after this date")
+    ap.add_argument("--signed-since", default="", help="contracts only: awards signed on or after this date")
     a = ap.parse_args(argv)
     root = Path(a.data_root)
     sources = ("tenders", "contracts") if a.source == "both" else (("tenders",) if a.source == "live" else (a.source,))
@@ -111,6 +112,8 @@ def main(argv: list[str] | None = None) -> int:
             col = "advertised_at" if "advertised_at" in df.columns else "published_at"
             if col in df.columns:
                 df = df.filter(pl.col(col).fill_null("") >= a.since)
+        if a.signed_since and "signed_on" in df.columns:
+            df = df.filter(pl.col("signed_on").fill_null("") >= a.signed_since)
         pool += df["tender_id"].cast(str).to_list()
     if not pool:
         print("nothing to sample from")

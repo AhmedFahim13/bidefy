@@ -214,8 +214,13 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     if len(pdf) < MIN_ROWS:
         return None
     n = len(pdf)
-    i_test = int(n * 0.80)
-    past, test = pdf.iloc[:i_test].copy(), pdf.iloc[i_test:].copy()
+    # Split on a date, not on a row number: awards signed on the same day must not straddle the
+    # boundary, or a few of the rows being forecast would share a day with rows used to fit.
+    cut_date = str(pdf["signed_on"].iloc[int(n * 0.80)])
+    is_test = pdf["signed_on"].astype(str) >= cut_date
+    past, test = pdf[~is_test].copy(), pdf[is_test].copy()
+    if len(test) < 100 or len(past) < MIN_ROWS:
+        return None
 
     vec, ridge = _fit_text(past, [test], seed)
     levels = {c: sorted(v for v in past[c].unique() if v) for c in CAT_COLS}
@@ -317,6 +322,7 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     metrics = _evaluate(bundle, test, live_security_share(Path(data_root)))
     metrics.update({"drift_allowance": round(drift, 3), "n_fit": len(past), "n_calibration": len(calib), "n_test": len(test),
                     "test_from": str(test["signed_on"].iloc[0]),
+                    "train_last_signed": str(past["signed_on"].iloc[-1]),
                     "trained_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "model_version": bundle["version"]})
 
@@ -359,13 +365,27 @@ def _evaluate(bundle: dict, test: pd.DataFrame, live_share: float | None = None)
         "deferral_at_band_limit": {str(lim): round(float(((ratio > lim) & (basis != "security")).mean()), 4)
                                    for lim in (4, 6, 8, 12, 20)},
     }
+    rng_ci = np.random.default_rng(7)
+
+    def ci(values: np.ndarray, stat, draws: int = 400) -> list[float]:
+        """Bootstrap a 95 percent interval, so a figure from few rows cannot pass as a firm one."""
+        if len(values) < 30:
+            return []
+        picks = rng_ci.integers(0, len(values), size=(draws, len(values)))
+        spread = np.array([stat(values[p]) for p in picks])
+        return [round(float(np.percentile(spread, 2.5)), 4), round(float(np.percentile(spread, 97.5)), 4)]
+
     for name in ("security", "history"):
         m = acted & (basis == name)
         out[f"{name}_n"] = int(m.sum())
+        out[f"{name}_n_including_declined"] = int((basis == name).sum())
         if m.any():
             out[f"{name}_mape"] = ape(q50, m)
             out[f"{name}_coverage_80"] = round(float(inside[m].mean()), 4)
             out[f"{name}_band_width_median"] = round(float(np.median(ratio[m])), 2)
+            errs = (np.abs(q50[m] - actual[m]) / actual[m])
+            out[f"{name}_mape_ci95"] = ci(errs, lambda v: float(np.median(v)))
+            out[f"{name}_coverage_ci95"] = ci(inside[m].astype(float), lambda v: float(v.mean()))
 
     # What a user actually meets. The test window's security coverage reflects how much of it has
     # been crawled, not how many notices publish a security, so resample the test rows to the mix

@@ -38,10 +38,11 @@ def _synthetic(root: Path, n=300, seed=1):
 
 def test_train_writes_model_and_honest_metrics(tmp_path: Path):
     _synthetic(tmp_path)
-    m = classifier.train(tmp_path, tmp_path / "models", threshold=0.55, seed=0)
+    m = classifier.train(tmp_path, tmp_path / "models", target_accuracy=0.90, seed=0)
     assert set(m) >= {"accuracy_acted", "deferral_rate", "coverage", "macro_f1", "n_labels", "n_classes",
-                      "threshold", "trained_at", "evaluation", "deferral_for_95"}
-    assert m["accuracy_acted"] >= 0.9 and 0 <= m["deferral_rate"] <= 0.5
+                      "threshold", "target_accuracy", "trained_at", "evaluation", "deferral_for_95"}
+    assert m["accuracy_acted"] >= m["target_accuracy"]      # the bar is set to deliver the target
+    assert 0 <= m["deferral_rate"] <= 0.6
     assert abs(m["coverage"] - (1 - m["deferral_rate"])) < 1e-9
     assert (tmp_path / "models" / "category.joblib").exists()
     metrics = json.loads((tmp_path / "models" / "metrics.json").read_text(encoding="utf-8"))
@@ -58,11 +59,11 @@ def test_labels_come_only_from_portal_tags(tmp_path: Path):
 
 def test_apply_defers_below_threshold(tmp_path: Path):
     _synthetic(tmp_path)
-    classifier.train(tmp_path, tmp_path / "models", threshold=0.55, seed=0)
+    classifier.train(tmp_path, tmp_path / "models", target_accuracy=0.90, seed=0)
     model = classifier.load(tmp_path / "models")
     out = classifier.apply(classifier.compose(["Procurement of laptop and printer for zone 3", "zzzz qqqq"]), model)
-    assert out[0][0] == "it_equipment" and out[0][1] >= 0.55
-    assert out[1][0] == "" and 0 <= out[1][1] < 0.55
+    assert out[0][0] == "it_equipment" and out[0][1] >= model["threshold"]
+    assert out[1][0] == "" and 0 <= out[1][1] < model["threshold"]
 
 
 def test_train_without_labels_returns_none(tmp_path: Path):

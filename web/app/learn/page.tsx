@@ -34,6 +34,17 @@ export default function LearnPage() {
         </ol>
       </div>
       <aside>
+        <div className="mb-8 rounded-sm border border-rule bg-surface p-4">
+          <p className="eyebrow">How accurate is any of this?</p>
+          <p className="mt-2 text-sm text-ink-2">
+            Bidefy publishes what each model gets right, how often it declines to answer, and what it was
+            measured against. Every figure is written by the training run itself, so it cannot drift from
+            the model it describes.
+          </p>
+          <a href="https://ahmedfahim13.github.io/bidefy/doc.html" rel="noreferrer" className="mt-2 inline-block text-sm text-brand">
+            Read the accuracy page
+          </a>
+        </div>
         <h2 className="border-b-2 border-ink pb-2 text-xl">Glossary</h2>
         <dl className="mt-3">
           {GLOSSARY.map((t) => (

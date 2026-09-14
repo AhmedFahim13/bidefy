@@ -5,14 +5,15 @@
 1. **Crawl.** One request per second against the portal's two public list endpoints, 200 rows a page, checkpointed after every flush, resumed across nights until the index is complete, then a daily delta that stops at the first page with nothing new.
 2. **Compact.** Small Parquet parts merge into one file once twenty accumulate, so the repository stays a few hundred files rather than thousands.
 3. **Resolve.** Bidder names are normalised (prefixes such as M/S dropped, punctuation stripped, Bangla combining marks kept), blocked on their first long token, and compared with character n-gram TF-IDF. Pairs at or above 0.92 merge, pairs from 0.80 to 0.92 wait in a review file for a human decision, and every entity gets a stable id from its canonical name.
-4. **Classify.** A sample of detail pages supplies the portal's own category tags, mapped to fifteen Bidefy categories as weak labels. A TF-IDF and logistic regression model predicts the category of every title and defers below a confidence threshold. Metrics are reported on the acted-on predictions with the deferral rate beside them.
-5. **Load.** The last twelve months and every live tender go to Cloudflare D1 in statements under 100 KB, capped at 45,000 rows per run so two runs a day stay under the free tier's 100,000 writes.
-6. **Serve.** A Worker answers the API from D1. The site on Vercel renders on the server from that API with short revalidation, so pages are fast and shareable.
-7. **Alert.** Every hour the Worker takes tenders newer than its watermark, matches them against each subscription's filters, sends web push through the Web Crypto push protocol, records what it sent so nothing repeats, and deletes endpoints that answer 404 or 410.
+4. **Fetch details.** Every open tender's detail page is fetched, one a second. It carries the portal's own category tags and the refundable tender security, which are the two most valuable fields on the whole portal and appear nowhere in the list pages.
+5. **Classify and price.** The category is read from those tags where present, and predicted only where it is not. The award band is built from the security where the notice publishes one, and from the entity's history otherwise. Both may decline.
+6. **Load.** The last twelve months and every live tender go to Cloudflare D1 in statements under 100 KB, budgeted in row writes rather than rows, because every index entry counts as one.
+7. **Serve.** A Worker answers the API from D1. The site on Vercel renders on the server from that API with short revalidation, so pages are fast and shareable.
+8. **Alert.** Every hour the Worker takes tenders newer than its watermark, matches them against each subscription's filters, sends web push through the Web Crypto push protocol, records what it sent so nothing repeats, and deletes endpoints that answer 404 or 410.
 
 ## The deferral principle
 
-A classifier that must answer every time is wrong more often than one allowed to say "not sure". Bidefy publishes accuracy only for the predictions it acts on, and publishes the deferral rate next to it, because a high accuracy with a hidden deferral rate is meaningless. The same rule will govern the award-value model: an interval and a coverage figure, never a single number.
+A classifier that must answer every time is wrong more often than one allowed to say "not sure". Bidefy publishes accuracy only for the predictions it acts on, and publishes the deferral rate next to it, because a high accuracy with a hidden deferral rate is meaningless. The award-value model follows the same rule: a band with its measured coverage, never a single number, and a decline when the band would be too wide to act on.
 
 ## How well the models work
 

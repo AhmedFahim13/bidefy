@@ -11,3 +11,7 @@
 *.pkl binary
 *.gz binary
 *.png binary
+
+# Captured portal responses: byte-exact test fixtures. Never convert their line endings,
+# or every checkout leaves them modified and the nightly job's rebase fails on the noise.
+tests/fixtures/** -text

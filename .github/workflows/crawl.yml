@@ -90,6 +90,10 @@ jobs:
           git add data checkpoints review models
           if git diff --cached --quiet; then echo "nothing to commit"; exit 0; fi
           git commit -m "data: ${{ steps.mode.outputs.endpoint }} ${{ steps.mode.outputs.mode }} $(date -u +%Y-%m-%dT%H:%MZ)"
+          # Anything still unstaged here is checkout noise, never crawl output: the crawl's files
+          # were just committed. Leaving it around makes the rebase below stash it and fail on a
+          # conflict, which once threw away a four-hour crawl.
+          git checkout -- . || true
           attempt=1
           while [ "$attempt" -le 3 ]; do
             if git pull --rebase --autostash && git push; then

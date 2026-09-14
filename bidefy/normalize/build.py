@@ -9,6 +9,7 @@ import polars as pl
 
 from ..crawler import store
 from ..models import award, classifier
+from ..models.categories import label_from_tags
 from ..models import flags as flagmod
 from . import resolve as r
 from .names import normalize_name
@@ -75,15 +76,50 @@ def _pe_counts(df: pl.DataFrame, count_col: str, zero_col: str) -> pl.DataFrame:
     )
 
 
-def _categorise(tenders: pl.DataFrame, models_dir: Path) -> pl.DataFrame:
-    """Add category and category_confidence when a trained model exists; otherwise leave the frame alone."""
-    bundle = classifier.load(models_dir)
-    if not bundle or "title" not in tenders.columns:
+def _tag_categories(data_root: Path) -> dict[str, str]:
+    """The portal's own category tags, mapped to Bidefy categories. Authoritative where present."""
+    details = store.load_all(Path(data_root), "details")
+    if details.is_empty() or "categories" not in details.columns:
+        return {}
+    out: dict[str, str] = {}
+    for tid, raw in details.select("tender_id", "categories").iter_rows():
+        try:
+            tags = json.loads(raw or "[]")
+        except json.JSONDecodeError:
+            continue
+        label = label_from_tags(tags)
+        if label:
+            out[str(tid)] = label
+    return out
+
+
+def _categorise(tenders: pl.DataFrame, models_dir: Path, data_root: Path) -> pl.DataFrame:
+    """Category per tender: the portal's own tags where we have the detail page, else the model.
+
+    Reading the answer beats predicting it. The classifier exists to cover tenders whose detail
+    page has not been fetched, and it still declines when it is not confident.
+    """
+    if "title" not in tenders.columns:
         return tenders
-    preds = classifier.apply(tenders["title"].fill_null("").to_list(), bundle)
+    tags = _tag_categories(data_root)
+    bundle = classifier.load(models_dir)
+    titles = tenders["title"].fill_null("").to_list()
+    ids = tenders["tender_id"].cast(pl.Utf8).to_list()
+    entities = tenders["procuring_entity"].fill_null("").to_list() if "procuring_entity" in tenders.columns else None
+    ministries = tenders["ministry"].fill_null("").to_list() if "ministry" in tenders.columns else None
+    texts = classifier.compose(titles, entities, ministries)
+    predicted = classifier.apply(texts, bundle) if bundle else [("", 0.0)] * len(titles)
+    categories, confidences, sources = [], [], []
+    for tid, (cat, conf) in zip(ids, predicted):
+        tagged = tags.get(tid)
+        if tagged:
+            categories.append(tagged); confidences.append(1.0); sources.append("portal")
+        else:
+            categories.append(cat); confidences.append(conf); sources.append("model" if cat else "")
     return tenders.with_columns(
-        pl.Series("category", [c for c, _ in preds], dtype=pl.Utf8),
-        pl.Series("category_confidence", [p for _, p in preds], dtype=pl.Float64),
+        pl.Series("category", categories, dtype=pl.Utf8),
+        pl.Series("category_confidence", confidences, dtype=pl.Float64),
+        pl.Series("category_source", sources, dtype=pl.Utf8),
     )
 
 
@@ -115,7 +151,7 @@ def build(data_root: Path, review_path: Path, models_dir: Path = Path("models"))
             pl.col("awardee").fill_null("").map_elements(lambda a: res.entity_of.get(a, ""), return_dtype=pl.Utf8).alias("bidder_id"),
             pl.col("procuring_entity").fill_null("").map_elements(_pe_id, return_dtype=pl.Utf8).alias("pe_id"),
         )
-        contracts = _categorise(contracts, Path(models_dir))
+        contracts = _categorise(contracts, Path(models_dir), data_root)
         _write(contracts, data_root, "contracts")
         awarded = contracts.filter(pl.col("bidder_id") != "")
         stats = awarded.group_by("bidder_id").agg(
@@ -147,7 +183,7 @@ def build(data_root: Path, review_path: Path, models_dir: Path = Path("models"))
         tenders = tenders.with_columns(
             pl.col("procuring_entity").fill_null("").map_elements(_pe_id, return_dtype=pl.Utf8).alias("pe_id")
         )
-        tenders = _categorise(tenders, Path(models_dir))
+        tenders = _categorise(tenders, Path(models_dir), data_root)
         _write(tenders, data_root, "tenders")
     frames = []
     if not tenders.is_empty():

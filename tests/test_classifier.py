@@ -39,19 +39,28 @@ def _synthetic(root: Path, n=300, seed=1):
 def test_train_writes_model_and_honest_metrics(tmp_path: Path):
     _synthetic(tmp_path)
     m = classifier.train(tmp_path, tmp_path / "models", threshold=0.55, seed=0)
-    assert set(m) >= {"accuracy_acted", "deferral_rate", "coverage", "macro_f1", "n_train", "n_test", "threshold", "trained_at", "labels_from_tags", "labels_from_title"}
+    assert set(m) >= {"accuracy_acted", "deferral_rate", "coverage", "macro_f1", "n_labels", "n_classes",
+                      "threshold", "trained_at", "evaluation", "deferral_for_95"}
     assert m["accuracy_acted"] >= 0.9 and 0 <= m["deferral_rate"] <= 0.5
     assert abs(m["coverage"] - (1 - m["deferral_rate"])) < 1e-9
     assert (tmp_path / "models" / "category.joblib").exists()
     metrics = json.loads((tmp_path / "models" / "metrics.json").read_text(encoding="utf-8"))
-    assert metrics["category_classifier"]["n_test"] == m["n_test"]
+    assert metrics["category_classifier"]["n_labels"] == m["n_labels"]
+
+
+def test_labels_come_only_from_portal_tags(tmp_path: Path):
+    """A title-keyword rule must never supply training labels: it taught the model to copy itself."""
+    _synthetic(tmp_path, n=300)
+    m = classifier.train(tmp_path, tmp_path / "models", seed=0)
+    detail_rows = pl.read_parquet(tmp_path / "raw" / "details" / "part-1.parquet").height
+    assert m["n_labels"] <= detail_rows        # never more labels than tagged detail pages
 
 
 def test_apply_defers_below_threshold(tmp_path: Path):
     _synthetic(tmp_path)
     classifier.train(tmp_path, tmp_path / "models", threshold=0.55, seed=0)
     model = classifier.load(tmp_path / "models")
-    out = classifier.apply(["Procurement of laptop and printer for zone 3", "zzzz qqqq"], model)
+    out = classifier.apply(classifier.compose(["Procurement of laptop and printer for zone 3", "zzzz qqqq"]), model)
     assert out[0][0] == "it_equipment" and out[0][1] >= 0.55
     assert out[1][0] == "" and 0 <= out[1][1] < 0.55
 

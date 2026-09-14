@@ -14,7 +14,7 @@ on:
         default: backfill
       budget_min:
         description: minutes before the run checkpoints and exits
-        default: "300"
+        default: "240"
 
 concurrency:
   group: crawl
@@ -66,7 +66,10 @@ jobs:
           echo "endpoint=$EP" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
       - name: Crawl
-        run: uv run python -m bidefy.crawler.run --endpoint "${{ steps.mode.outputs.endpoint }}" --mode "${{ steps.mode.outputs.mode }}" --budget-min "${INPUT_BUDGET:-300}"
+        run: uv run python -m bidefy.crawler.run --endpoint "${{ steps.mode.outputs.endpoint }}" --mode "${{ steps.mode.outputs.mode }}" --budget-min "${INPUT_BUDGET:-240}"
+      - name: Fetch live tender details
+        continue-on-error: true
+        run: uv run python -m bidefy.crawler.details --source live --n 1500 --budget-min 25 --interval 1.0
       - name: Compact
         env:
           EP: ${{ steps.mode.outputs.endpoint }}

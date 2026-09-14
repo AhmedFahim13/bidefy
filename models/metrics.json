@@ -1,28 +1,77 @@
 {
   "category_classifier": {
-    "accuracy_acted": 0.9061,
-    "deferral_rate": 0.1581,
-    "coverage": 0.8419,
-    "macro_f1": 0.8429,
-    "accuracy_all": 0.8558,
-    "n_train": 4600,
-    "n_test": 1151,
+    "accuracy_acted": 0.9303,
+    "deferral_rate": 0.4311,
+    "coverage": 0.5689,
+    "accuracy_all": 0.7627,
+    "macro_f1": 0.6284,
+    "n_labels": 5470,
     "n_classes": 15,
-    "threshold": 0.55,
-    "labels_from_tags": 1157,
-    "labels_from_title": 4594,
-    "trained_at": "2026-09-13T10:02:20Z"
+    "classes_dropped_for_sparsity": [],
+    "threshold": 0.8341,
+    "target_accuracy": 0.93,
+    "evaluation": "cross-validated on portal category tags only, entity priors from the training fold",
+    "brief_dropout": 0.3,
+    "scored_with_brief": true,
+    "trained_at": "2026-09-14T08:17:33Z",
+    "deferral_for_93": 0.4311,
+    "deferral_for_95": 0.4938,
+    "deferral_for_97": 0.5962
   },
   "award_value_model": {
-    "mape_acted": 0.4935,
-    "mape_baseline": 0.5652,
-    "coverage_80": 0.7903,
-    "deferral_rate": 0.2534,
-    "band_ratio_median": 11.26,
-    "n_train": 168435,
-    "n_test": 42109,
+    "mape_acted": 0.3386,
+    "mape_naive_median": 0.78,
+    "coverage_80": 0.7709,
+    "deferral_rate": 0.2793,
+    "band_width_median": 4.6,
+    "band_width_p25": 3.07,
+    "band_width_p75": 6.74,
+    "unconditional_spread": 58.8,
+    "security_share_of_test": 0.0372,
+    "deferral_at_band_limit": {
+      "4": 0.7083,
+      "6": 0.4934,
+      "8": 0.3756,
+      "12": 0.2515,
+      "20": 0.1366
+    },
+    "security_n": 1586,
+    "security_n_including_declined": 1586,
+    "security_mape": 0.0839,
+    "security_coverage_80": 0.8392,
+    "security_band_width_median": 1.46,
+    "security_mape_ci95": [
+      0.0803,
+      0.0895
+    ],
+    "security_coverage_ci95": [
+      0.8216,
+      0.8569
+    ],
+    "history_n": 29107,
+    "history_n_including_declined": 40999,
+    "history_mape": 0.3632,
+    "history_coverage_80": 0.7671,
+    "history_band_width_median": 4.77,
+    "history_mape_ci95": [
+      0.3571,
+      0.3681
+    ],
+    "history_coverage_ci95": [
+      0.762,
+      0.7716
+    ],
+    "live_security_share": 0.8,
+    "expected_mape_on_open_tenders": 0.099,
+    "expected_coverage_on_open_tenders": 0.8277,
+    "expected_band_width_on_open_tenders": 1.46,
+    "drift_allowance": 1.05,
+    "n_fit": 167959,
+    "n_calibration": 100776,
+    "n_test": 42585,
     "test_from": "2026-05-11",
-    "trained_at": "2026-09-13T11:19:07Z",
-    "model_version": "award-20260913"
+    "train_last_signed": "2026-05-10",
+    "trained_at": "2026-09-14T08:54:06Z",
+    "model_version": "award-20260914"
   }
 }

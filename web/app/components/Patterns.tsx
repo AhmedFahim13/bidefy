@@ -6,11 +6,14 @@ function pct(v: unknown): string {
 
 export function Patterns({ flags, kind }: { flags: Flags | null | undefined; kind: "bidder" | "entity" }) {
   const notes = Array.isArray(flags?.notes) ? (flags!.notes as string[]) : [];
+  const loaded = !!flags && Object.keys(flags).length > 0;
   const n = typeof flags?.awards_12m === "number" ? (flags!.awards_12m as number) : 0;
   return (
     <section className="mt-8 border-t-2 border-ink pt-3">
       <p className="eyebrow">Patterns in the last 12 months</p>
-      {n === 0 ? (
+      {!loaded ? (
+        <p className="mt-2 text-sm text-ink-3">Pattern data has not been loaded for this profile yet. It arrives with the nightly data load.</p>
+      ) : n === 0 ? (
         <p className="mt-2 text-sm text-ink-3">No awards in the last twelve months, so no patterns to report.</p>
       ) : (
         <>

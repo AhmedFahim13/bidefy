@@ -8,7 +8,8 @@ from pathlib import Path
 import polars as pl
 
 from ..crawler import store
-from ..models import classifier
+from ..models import award, classifier
+from ..models import flags as flagmod
 from . import resolve as r
 from .names import normalize_name
 
@@ -170,6 +171,25 @@ def build(data_root: Path, review_path: Path, models_dir: Path = Path("models"))
     else:
         pes = pes.with_columns(pl.lit(None, dtype=pl.Utf8).alias("recent_awards"), pl.lit(None, dtype=pl.Utf8).alias("top_bidders"))
     pes = pes.with_columns(pl.col("recent_awards").fill_null("[]"), pl.col("top_bidders").fill_null("[]"))
+    # concentration and residual flags over the last twelve months of awards
+    since = flagmod.since_default()
+    bands = None
+    if not contracts.is_empty():
+        bundle = award.load(Path(models_dir))
+        recent = contracts.filter((pl.col("bidder_id") != "") & (pl.col("signed_on").fill_null("") >= since))
+        if bundle is not None and not recent.is_empty():
+            bands = award.predict(recent, bundle, date_col="signed_on").select("tender_id", "q10_lakh", "q90_lakh")
+        pes = pes.join(flagmod.entity_flags(contracts, since), on="pe_id", how="left")
+        bidders_path = data_root / "clean" / "bidders.parquet"
+        if bidders_path.exists():
+            b = pl.read_parquet(bidders_path)
+            if "flags" in b.columns:
+                b = b.drop("flags")
+            b = b.join(flagmod.bidder_flags(contracts, bands, since), on="bidder_id", how="left").with_columns(pl.col("flags").fill_null("{}"))
+            _write(b, data_root, "bidders")
+    if "flags" not in pes.columns:
+        pes = pes.with_columns(pl.lit("{}").alias("flags"))
+    pes = pes.with_columns(pl.col("flags").fill_null("{}"))
     _write(pes, data_root, "procuring_entities")
     return {
         "tenders": tenders.height, "contracts": contracts.height, "bidders": n_bidders,

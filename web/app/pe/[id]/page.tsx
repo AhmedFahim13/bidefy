@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { api } from "@/lib/api";
 import { formatCrore } from "@/lib/format";
 import { Stat } from "../../components/Stat";
+import { Patterns } from "../../components/Patterns";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -27,6 +28,7 @@ export default async function PePage({ params }: Props) {
         <Stat label="Tenders indexed" value={pe.n_tenders} />
         <Stat label="Awards indexed" value={pe.n_contracts} />
       </div>
+      <Patterns flags={data.flags} kind="entity" />
       <section className="mt-10">
         <h2 className="border-b-2 border-ink pb-2 text-xl">Top bidders</h2>
         {data.top_bidders.length ? (

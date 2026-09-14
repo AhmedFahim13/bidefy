@@ -4,6 +4,7 @@ import { Filters } from "./components/Filters";
 import { Pagination } from "./components/Pagination";
 import { Stat } from "./components/Stat";
 import { TenderCard } from "./components/TenderCard";
+import { PAGE_SIZES } from "./components/Pagination";
 
 type Search = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
@@ -12,8 +13,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   const sp = await searchParams;
   const state = { q: one(sp.q).trim(), status: one(sp.status) || "Live", ministry: one(sp.ministry), category: one(sp.category) };
   const page = Math.max(1, Number.parseInt(one(sp.page) || "1", 10) || 1);
-  const size = 25;
-  const qs = buildQuery({ ...state, page, size });
+  const requested = Number.parseInt(one(sp.size) || "25", 10);
+  const size = PAGE_SIZES.includes(requested) ? requested : 25;
+  const qs = buildQuery({ ...state, page, size: size === 25 ? "" : size });
   const [stats, options, list] = await Promise.all([api.stats(), api.filters(), api.tenders(qs)]);
   const items = list?.items ?? [];
 
@@ -55,7 +57,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
             {list ? "No tenders match those filters." : "The data service did not respond. Try again in a minute."}
           </p>
         )}
-        <Pagination page={page} hasNext={items.length === size} params={state} />
+        <Pagination page={page} size={size} hasNext={items.length === size} params={state} />
       </section>
     </div>
   );

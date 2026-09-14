@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { bidderQuery, parseJsonList, parseTenderFilters, peQuery, predictionQuery, tenderByIdQuery, tenderListQuery } from "./query";
+import { bidderQuery, parseJsonList, parseJsonObject, parseTenderFilters, peQuery, predictionQuery, tenderByIdQuery, tenderListQuery } from "./query";
 import { newSubscriptionId, validateSubscription } from "./subscriptions";
 import { runAlerts } from "./alerts";
 import { hashIp, validateAccessRequest } from "./access";
@@ -63,8 +63,8 @@ app.get("/api/v1/bidders/:id", async (c) => {
   const b = bidderQuery(id);
   const bidder = await c.env.DB.prepare(b.sql).bind(...b.params).first<Record<string, unknown>>();
   if (!bidder) return c.json({ error: "not found" }, 404);
-  const { recent_awards, ...rest } = bidder;
-  return c.json({ bidder: rest, awards: parseJsonList(recent_awards) });
+  const { recent_awards, flags, ...rest } = bidder;
+  return c.json({ bidder: rest, awards: parseJsonList(recent_awards), flags: parseJsonObject(flags) });
 });
 
 app.get("/api/v1/pe/:id", async (c) => {
@@ -72,8 +72,8 @@ app.get("/api/v1/pe/:id", async (c) => {
   const p = peQuery(id);
   const pe = await c.env.DB.prepare(p.sql).bind(...p.params).first<Record<string, unknown>>();
   if (!pe) return c.json({ error: "not found" }, 404);
-  const { recent_awards, top_bidders, ...rest } = pe;
-  return c.json({ procuring_entity: rest, top_bidders: parseJsonList(top_bidders), recent_awards: parseJsonList(recent_awards) });
+  const { recent_awards, top_bidders, flags, ...rest } = pe;
+  return c.json({ procuring_entity: rest, top_bidders: parseJsonList(top_bidders), recent_awards: parseJsonList(recent_awards), flags: parseJsonObject(flags) });
 });
 
 app.get("/api/v1/filters", async (c) => {

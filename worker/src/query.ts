@@ -63,3 +63,14 @@ export function parseJsonList(value: unknown): unknown[] {
     return [];
   }
 }
+
+/** Parse a JSON aggregate column holding an object; never throws. */
+export function parseJsonObject(value: unknown): Record<string, unknown> {
+  if (typeof value !== "string" || !value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}

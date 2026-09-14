@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { api, API_BASE } from "@/lib/api";
+import { api } from "@/lib/api";
 import { AlertsForm } from "../components/AlertsForm";
 
 export const metadata: Metadata = { title: "Alerts" };
@@ -21,7 +21,7 @@ export default async function AlertsPage() {
         </ul>
       </div>
       <AlertsForm
-        apiBase={API_BASE}
+        apiBase=""
         ministries={(options?.ministries ?? []).map((m) => m.v)}
         statuses={(options?.statuses ?? []).map((s) => s.v)}
         categories={(options?.categories ?? []).map((c) => c.v)}

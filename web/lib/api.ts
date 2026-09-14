@@ -71,6 +71,6 @@ export const api = {
   filters: () => get<Filters>("/api/v1/filters", 3600),
   tenders: (qs: string) => get<{ page: number; size: number; items: Tender[] }>(`/api/v1/tenders${qs ? "?" + qs : ""}`, 120),
   tender: (id: string) => get<{ tender: Tender; similar_awards: Award[]; prediction: Prediction | null }>(`/api/v1/tenders/${encodeURIComponent(id)}`),
-  bidder: (id: string) => get<{ bidder: Bidder; awards: Award[] }>(`/api/v1/bidders/${encodeURIComponent(id)}`),
-  pe: (id: string) => get<{ procuring_entity: PE; top_bidders: TopBidder[] }>(`/api/v1/pe/${encodeURIComponent(id)}`),
+  bidder: (id: string) => get<{ bidder: Bidder; awards: Award[]; flags?: Record<string, unknown> }>(`/api/v1/bidders/${encodeURIComponent(id)}`),
+  pe: (id: string) => get<{ procuring_entity: PE; top_bidders: TopBidder[]; recent_awards?: Award[]; flags?: Record<string, unknown> }>(`/api/v1/pe/${encodeURIComponent(id)}`),
 };

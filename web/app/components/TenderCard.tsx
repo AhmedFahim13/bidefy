@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Tender } from "@/lib/api";
 import { categoryLabel } from "@/lib/categories";
 import { daysLeft, formatDate } from "@/lib/format";
+import { Term } from "./Term";
 
 export function CategoryChip({ category }: { category?: string | null }) {
   if (!category) return null;
@@ -30,7 +31,7 @@ export function TenderCard({ t, index = 0 }: { t: Tender; index?: number }) {
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill status={t.status} />
           <span className="num text-xs text-ink-3">{t.tender_id}</span>
-          {t.method ? <span className="text-xs text-ink-3">{t.method}</span> : null}
+          <Term value={t.method} />
           {t.nature ? <span className="text-xs text-ink-3">{t.nature}</span> : null}
           <CategoryChip category={t.category} />
         </div>

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { api } from "@/lib/api";
 import { formatCrore, formatDate, formatLakh } from "@/lib/format";
 import { CategoryChip, ClosingBadge, StatusPill } from "../../components/TenderCard";
+import { Term } from "../../components/Term";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -43,7 +44,7 @@ export default async function TenderPage({ params }: Props) {
           <Row k="Procuring entity"><Link href={`/pe/${t.pe_id}`} className="text-brand">{t.procuring_entity}</Link></Row>
           <Row k="Ministry">{t.ministry}{t.organization ? <span className="text-ink-3"> · {t.organization}</span> : null}</Row>
           <Row k="Nature">{t.nature || "n/a"}</Row>
-          <Row k="Method">{t.method || "n/a"}{t.procurement_type ? <span className="text-ink-3"> · {t.procurement_type}</span> : null}</Row>
+          <Row k="Method"><Term value={t.method} />{t.procurement_type ? <span className="text-ink-3"> · <Term value={t.procurement_type} /></span> : null} <Link href="/learn" className="ml-2 text-xs text-brand">What these terms mean</Link></Row>
           <Row k="Published"><span className="num">{formatDate(t.published_at) || "n/a"}</span></Row>
           <Row k="Closes"><span className="num">{formatDate(t.closing_at) || "n/a"}</span></Row>
         </dl>

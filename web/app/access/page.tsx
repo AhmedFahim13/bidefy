@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { API_BASE } from "@/lib/api";
 import { AccessForm } from "../components/AccessForm";
 
 export const metadata: Metadata = { title: "Request access to Pro" };
@@ -24,7 +23,7 @@ export default function AccessPage() {
           <span className="num text-2xl font-medium">2,500 taka</span> a month, placeholder. Nothing is charged yet. The first group gets it free in exchange for feedback.
         </p>
       </div>
-      <AccessForm apiBase={API_BASE} />
+      <AccessForm apiBase="" />
     </div>
   );
 }

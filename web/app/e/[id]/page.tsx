@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { api } from "@/lib/api";
 import { formatCrore, formatDate } from "@/lib/format";
 import { Stat } from "../../components/Stat";
+import { Patterns } from "../../components/Patterns";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -38,6 +39,7 @@ export default async function BidderPage({ params }: Props) {
         <Stat label="First award" value={formatDate(b.first_award) || "n/a"} />
         <Stat label="Latest award" value={formatDate(b.last_award) || "n/a"} />
       </div>
+      <Patterns flags={data.flags} kind="bidder" />
       <section className="mt-10">
         <h2 className="border-b-2 border-ink pb-2 text-xl">Awards</h2>
         {data.awards.length ? (

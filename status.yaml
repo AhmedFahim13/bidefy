@@ -55,7 +55,7 @@ phases:
       - {id: w6-learn, title: "Procurement primer, glossary, tooltips and Learn page", owner: claude, state: done, weight: 2}
       - {id: w6-paging, title: "Page jump and page size on the tender list", owner: claude, state: done, weight: 1}
       - {id: w6-login, title: "Run npx wrangler login again in your terminal (token expired)", owner: fahim, state: todo, weight: 1}
-      - {id: w6-token, title: "Edit the Cloudflare API token to add Workers Scripts: Edit, then re-run the Deploy Worker workflow", owner: fahim, state: todo, weight: 2, note: "Deploy Worker run 34805730517 failed with authentication error 10000; migrations applied fine"}
+      - {id: w6-token, title: "Cloudflare API token extended to Workers Scripts: Edit; Deploy Worker workflow green", owner: fahim, state: done, weight: 2}
       - {id: w6-primer, title: "Read docs/product/04-primer.md before any interview", owner: fahim, state: todo, weight: 1, note: "Also live at bidefy.vercel.app/learn"}
   - id: w7
     name: "Week 7: product document, pricing, polish"

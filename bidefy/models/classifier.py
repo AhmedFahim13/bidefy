@@ -183,14 +183,17 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
 
     rng = np.random.default_rng(seed)
     briefs = df["brief"].fill_null("").to_list() if "brief" in df.columns else [""] * df.height
-    kept = ["" if rng.random() < BRIEF_DROPOUT else b for b in briefs]
-    X = compose(df["title"], df["procuring_entity"], df["ministry"], kept)
+    # Train on text whose brief is sometimes blanked, so the model tolerates a missing detail page.
+    # Score on text with the brief present, because that is how nearly every open tender arrives.
+    X_train = compose(df["title"], df["procuring_entity"], df["ministry"],
+                      ["" if rng.random() < BRIEF_DROPOUT else b for b in briefs])
+    X = compose(df["title"], df["procuring_entity"], df["ministry"], briefs)
     entities = df["procuring_entity"].fill_null("").to_list()
     y = np.array(df["label"].to_list())
     folds = min(FOLDS, int(counts.filter(pl.col("label").is_in(list(keep)))["len"].min()))
     conf_parts, correct_parts, pred_parts, true_parts = [], [], [], []
     for tr, te in StratifiedKFold(n_splits=max(folds, 2), shuffle=True, random_state=seed).split(X, y):
-        fold = _pipeline(seed).fit([X[i] for i in tr], y[tr])
+        fold = _pipeline(seed).fit([X_train[i] for i in tr], y[tr])
         classes = list(fold.classes_)
         proba = fold.predict_proba([X[i] for i in te])
         # Priors from the training fold only, so no row is ever helped by its own label.
@@ -218,11 +221,12 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
         "target_accuracy": target_accuracy,
         "evaluation": "cross-validated on portal category tags only, entity priors from the training fold",
         "brief_dropout": BRIEF_DROPOUT,
+        "scored_with_brief": True,
         "trained_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         **_deferral_for_accuracy(conf, correct),
     }
 
-    final = _pipeline(seed).fit(X, y)
+    final = _pipeline(seed).fit(X_train, y)
     final_classes = list(final.classes_)
     models_dir = Path(models_dir)
     models_dir.mkdir(parents=True, exist_ok=True)

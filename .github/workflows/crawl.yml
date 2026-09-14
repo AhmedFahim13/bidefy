@@ -82,6 +82,7 @@ jobs:
           uv run python -m bidefy.normalize.build
           uv run python -m bidefy.models.award train
           uv run python -m bidefy.models.award apply
+          uv run python tools/write_accuracy_doc.py
       - name: Commit data
         run: |
           git config user.name "bidefy-bot"

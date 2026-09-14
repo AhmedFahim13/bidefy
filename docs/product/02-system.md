@@ -14,37 +14,19 @@
 
 A classifier that must answer every time is wrong more often than one allowed to say "not sure". Bidefy publishes accuracy only for the predictions it acts on, and publishes the deferral rate next to it, because a high accuracy with a hidden deferral rate is meaningless. The same rule will govern the award-value model: an interval and a coverage figure, never a single number.
 
-## Model metrics at launch (v0.1, 13 September 2026)
+## How well the models work
 
-| Figure | Value |
-|---|---|
-| Detail pages sampled for labels | 1,427 |
-| Labels from portal tags | 1,157 |
-| Training titles including title-keyword labels | 4,600 |
-| Held-out test titles | 1,151 |
-| Classes | 15 |
-| Accuracy on acted-on predictions | 0.906 |
-| Deferral rate | 0.158 |
-| Macro F1 over all predictions | 0.843 |
-| Confidence threshold | 0.55 |
+Every current figure lives on its own page, [What Bidefy gets right, and how often](05-accuracy.md), which is rewritten by each training run so it cannot drift from the model it describes. The short version:
 
-Read the first two rows together: 90.6 percent of the categories Bidefy commits to are right, and it declines to commit on 15.8 percent of tenders. The command centre shows the live figures from `models/metrics.json` after every nightly retrain.
+- An award band built from the tender security published in the notice lands within about 8 percent of the real award value. A band built from the entity's history alone is far looser.
+- A tender's category is read from the portal's own tags for every live tender, so on the live site it is not a prediction at all. The classifier only covers the archive.
+- Both models may decline, and the deferral rate is always printed beside the accuracy.
 
-## Award-value model at first training (week 5, 13 September 2026)
+## Two lessons worth keeping
 
-| Figure | Value |
-|---|---|
-| Awards used | 210,544, split by signing date |
-| Training awards | 168,435 |
-| Test awards (latest 20 percent, from 11 May 2026) | 42,109 |
-| Median absolute percentage error, acted-on | 0.493 |
-| Same error for the naive baseline (median by entity and category) | 0.565 |
-| Coverage of the 80 percent band on acted-on test awards | 0.790 |
-| Deferral rate on test | 0.253 |
-| Median band width, high over low | about 11x |
-| Live tenders with a band | 2,651 of 3,405 |
+**A model must not be scored on a rule you wrote.** The category model once trained partly on labels produced by a keyword rule inside Bidefy, and was then scored on a test set containing those same labels. It looked accurate. Measured against the portal's own tags it was not, and feeding it twenty thousand keyword labels drove real accuracy from 89.8 percent to 55.4 percent. The labels were removed.
 
-The band is a median model with split-conformal residual quantiles, calibrated per category where at least thirty calibration awards exist. Award values in Bangladesh span four orders of magnitude within one category, so an honest 80 percent band is wide; the product shows it as a range and the most likely value, and declines when the band would exceed 20x. The error figure is a median over held-out awards that happened after the training data, not a fit on the past.
+**Read the answer before predicting it.** The portal publishes category tags on each tender's detail page, and a tender security that is a fixed share of the buyer's own cost estimate. Fetching those pages turned the category from a prediction into a lookup, and cut the award band from roughly eleven times wide to about one and a half. Most of the accuracy came from collecting better evidence, not from a better model.
 
 ## Budgets that shape the design
 

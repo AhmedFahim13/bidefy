@@ -28,6 +28,8 @@ from sklearn.metrics import f1_score
 from sklearn.model_selection import StratifiedKFold
 from sklearn.pipeline import FeatureUnion, Pipeline
 
+from collections import defaultdict
+
 from ..crawler import store
 from .categories import label_from_tags
 
@@ -36,7 +38,8 @@ FALLBACK_THRESHOLD = 0.60
 MIN_LABELS = 60
 MIN_PER_CLASS = 5
 FOLDS = 5
-BUNDLE_FORMAT = 2
+BUNDLE_FORMAT = 3
+ENTITY_PRIOR_WEIGHT = 1.0   # a buyer's own history, combined with the text model as evidence
 
 
 def compose(titles, entities=None, ministries=None) -> list[str]:
@@ -97,6 +100,40 @@ def _pipeline(seed: int) -> Pipeline:
     ])
 
 
+def _entity_counts(entities: list[str], labels: np.ndarray, classes: list[str], rows) -> dict[str, np.ndarray]:
+    """How often each buyer has bought each category, from the given rows only."""
+    pos = {c: i for i, c in enumerate(classes)}
+    tally: dict[str, np.ndarray] = defaultdict(lambda: np.zeros(len(classes)))
+    for i in rows:
+        if entities[i]:
+            tally[entities[i]][pos[labels[i]]] += 1
+    return dict(tally)
+
+
+def _blend_with_entity(proba: np.ndarray, entities: list[str], counts: dict[str, np.ndarray],
+                       weight: float = ENTITY_PRIOR_WEIGHT) -> np.ndarray:
+    """Multiply the text model's probabilities by what this buyer usually buys, then renormalise.
+
+    A Roads Division buys roads, and a short tender title often does not say so. Buyers with no
+    history are left untouched. The ministry was tried the same way and made things worse: it is
+    too broad to say anything a buyer's own record does not say better.
+    """
+    if not counts or weight <= 0:
+        return proba
+    out = proba.copy()
+    n_classes = proba.shape[1]
+    for row, entity in enumerate(entities):
+        tally = counts.get(entity)
+        if tally is None:
+            continue
+        prior = (tally + 1.0) / (tally.sum() + n_classes)
+        blended = proba[row] * prior ** weight
+        total = blended.sum()
+        if total > 0:
+            out[row] = blended / total
+    return out
+
+
 def _deferral_for_accuracy(conf: np.ndarray, correct: np.ndarray, targets=(0.93, 0.95, 0.97)) -> dict:
     """Smallest deferral that reaches each accuracy, declining the least confident predictions first."""
     order = np.argsort(-conf)
@@ -131,13 +168,16 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
         return None
 
     X = compose(df["title"], df["procuring_entity"], df["ministry"])
+    entities = df["procuring_entity"].fill_null("").to_list()
     y = np.array(df["label"].to_list())
     folds = min(FOLDS, int(counts.filter(pl.col("label").is_in(list(keep)))["len"].min()))
     conf_parts, correct_parts, pred_parts, true_parts = [], [], [], []
     for tr, te in StratifiedKFold(n_splits=max(folds, 2), shuffle=True, random_state=seed).split(X, y):
         fold = _pipeline(seed).fit([X[i] for i in tr], y[tr])
-        proba = fold.predict_proba([X[i] for i in te])
         classes = list(fold.classes_)
+        proba = fold.predict_proba([X[i] for i in te])
+        # Priors from the training fold only, so no row is ever helped by its own label.
+        proba = _blend_with_entity(proba, [entities[i] for i in te], _entity_counts(entities, y, classes, tr))
         conf_parts.append(proba.max(axis=1))
         pred = np.array([classes[i] for i in proba.argmax(axis=1)])
         pred_parts.append(pred); correct_parts.append(pred == y[te]); true_parts.append(y[te])
@@ -159,15 +199,18 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
         "classes_dropped_for_sparsity": dropped,
         "threshold": round(threshold, 4),
         "target_accuracy": target_accuracy,
-        "evaluation": "cross-validated on portal category tags only",
+        "evaluation": "cross-validated on portal category tags only, entity priors from the training fold",
         "trained_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         **_deferral_for_accuracy(conf, correct),
     }
 
     final = _pipeline(seed).fit(X, y)
+    final_classes = list(final.classes_)
     models_dir = Path(models_dir)
     models_dir.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"model": final, "threshold": threshold, "classes": list(final.classes_), "format": BUNDLE_FORMAT},
+    joblib.dump({"model": final, "threshold": threshold, "classes": final_classes, "format": BUNDLE_FORMAT,
+                 "entity_counts": _entity_counts(entities, y, final_classes, range(len(y))),
+                 "entity_prior_weight": ENTITY_PRIOR_WEIGHT},
                 models_dir / "category.joblib", compress=3)
     mpath = models_dir / "metrics.json"
     existing = json.loads(mpath.read_text(encoding="utf-8")) if mpath.exists() else {}
@@ -184,12 +227,15 @@ def load(models_dir: Path) -> dict | None:
     return bundle if bundle.get("format") == BUNDLE_FORMAT else None
 
 
-def apply(texts: list[str], bundle: dict) -> list[tuple[str, float]]:
+def apply(texts: list[str], bundle: dict, entities: list[str] | None = None) -> list[tuple[str, float]]:
     """(category, confidence) per text; category is '' when confidence is below the threshold."""
     if not texts:
         return []
     proba = bundle["model"].predict_proba([t or "" for t in texts])
     classes = bundle["classes"]
+    if entities is not None:
+        proba = _blend_with_entity(proba, [e or "" for e in entities], bundle.get("entity_counts", {}),
+                                   bundle.get("entity_prior_weight", ENTITY_PRIOR_WEIGHT))
     out = []
     for row in proba:
         i = int(row.argmax())

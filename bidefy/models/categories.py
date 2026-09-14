@@ -29,22 +29,47 @@ LABELS = {
 }
 
 # Keyword stems matched against the lowercased, space-joined tag text from the detail page.
+# These name SUBJECTS, never actions. "Repair and maintenance" describes work done to a vehicle,
+# a building or a pump alike, so including it made a vehicle-repair tender compete with itself
+# and lose: the tag list resolved to no category at all. Nineteen percent of tagged tenders were
+# being thrown away that way.
 TAG_KEYWORDS: dict[str, list[str]] = {
-    "roads_bridges": ["highway", "road", "bridge", "culvert", "pavement", "embankment", "bituminous", "flyover", "footpath"],
-    "buildings_civil": ["building", "construction work", "civil", "brick", "cement", "concrete", "roofing", "plaster", "renovation", "repair and maintenance", "boundary wall", "school building", "hostel"],
-    "water_sanitation": ["water supply", "sanitation", "sewer", "drain", "tube well", "pipe", "pump", "latrine", "toilet", "water treatment", "irrigation"],
-    "electrical_power": ["electric", "transformer", "cable", "generator", "solar", "substation", "lighting", "conductor", "meter", "power distribution", "wiring", "switchgear"],
-    "it_equipment": ["computer", "software", "server", "laptop", "printer", "network", "hardware", "data-processing", "data processing", "scanner", "photocopy", "ict", "telecommunication", "camera"],
-    "office_supplies": ["stationery", "office supplies", "paper", "toner", "pen", "file", "envelope", "office equipment", "office machinery"],
-    "furniture": ["furniture", "chair", "table", "almirah", "cabinet", "shelv", "bed", "sofa", "desk"],
-    "medical": ["medical", "pharmaceutical", "medicine", "drug", "hospital", "surgical", "laboratory", "reagent", "diagnostic", "vaccine", "dental", "x-ray", "health"],
-    "vehicles_transport": ["vehicle", "motor", "car", "bus", "truck", "ambulance", "motorcycle", "tyre", "spare parts", "boat", "vessel", "transport services"],
-    "food_catering": ["food", "rice", "catering", "meal", "ration", "beverage", "oil", "sugar", "flour", "diet", "kitchen"],
-    "textiles_uniforms": ["textile", "uniform", "cloth", "garment", "fabric", "shoe", "footwear", "blanket", "bedding", "insignia", "yarn"],
-    "printing_media": ["printing", "publication", "book", "advertis", "media", "signboard", "banner", "binding", "newspaper"],
-    "security_cleaning_services": ["security service", "guard", "cleaning", "janitorial", "waste", "pest control", "gardening", "outsourc", "manpower"],
-    "consultancy": ["consultan", "advisory", "study", "survey", "design services", "audit", "training services", "research services", "feasibility"],
-    "agriculture_environment": ["agricultur", "seed", "fertili", "livestock", "fish", "forest", "tree", "plant", "veterinary", "poultry", "crop", "environment"],
+    "roads_bridges": ["highway", "road", "bridge", "culvert", "pavement", "embankment", "bituminous",
+                      "flyover", "footpath", "asphalt"],
+    "buildings_civil": ["building", "brick", "cement", "concrete", "roofing", "plaster", "boundary wall",
+                        "school building", "hostel", "structural", "wood", "timber", "sawn", "carpentry",
+                        "tile", "glass", "paint", "sanitary ware", "construction material"],
+    "water_sanitation": ["water supply", "sanitation", "sewer", "drain", "tube well", "pipe", "pump",
+                         "latrine", "toilet", "water treatment", "irrigation", "water distribution"],
+    "electrical_power": ["electric", "transformer", "cable", "generator", "solar", "substation",
+                         "lighting", "conductor", "meter", "power distribution", "wiring", "switchgear",
+                         "battery", "energy"],
+    "it_equipment": ["computer", "software", "server", "laptop", "printer", "network", "hardware",
+                     "data-processing", "data processing", "scanner", "photocopy", "ict",
+                     "telecommunication", "camera", "information system"],
+    "office_supplies": ["stationery", "office supplies", "paper", "toner", "pen", "envelope",
+                        "office equipment", "office machinery", "consumable"],
+    "furniture": ["furniture", "chair", "seat", "table", "almirah", "cabinet", "shelv", "bed", "sofa",
+                  "desk", "handicraft"],
+    "medical": ["medical", "pharmaceutical", "medicine", "medicinal", "drug", "hospital", "surgical",
+                "laboratory", "reagent", "diagnostic", "vaccine", "dental", "x-ray", "health",
+                "orthopaedic", "anaesthe"],
+    "vehicles_transport": ["vehicle", "motor", "car", "bus", "truck", "ambulance", "motorcycle", "tyre",
+                           "spare parts", "boat", "vessel", "transport services", "petroleum", "fuel",
+                           "diesel", "lubricant", "oil and associated"],
+    "food_catering": ["food", "rice", "catering", "meal", "ration", "beverage", "sugar", "flour",
+                      "diet", "kitchen", "dairy", "fish product"],
+    "textiles_uniforms": ["textile", "uniform", "cloth", "garment", "fabric", "shoe", "footwear",
+                          "blanket", "bedding", "insignia", "yarn", "leather"],
+    "printing_media": ["printing", "publication", "book", "advertis", "media", "signboard", "banner",
+                       "binding", "newspaper", "broadcast"],
+    "security_cleaning_services": ["security service", "guard", "cleaning", "janitorial", "waste",
+                                   "pest control", "gardening", "outsourc", "manpower", "laundry",
+                                   "dry-cleaning", "washing", "sewage disposal"],
+    "consultancy": ["consultan", "advisory", "design services", "audit", "training services",
+                    "research services", "feasibility", "architectural", "engineering services"],
+    "agriculture_environment": ["agricultur", "seed", "fertili", "livestock", "fish", "forest", "tree",
+                                "plant", "veterinary", "poultry", "crop", "environment", "pesticide"],
 }
 
 TITLE_KEYWORDS: dict[str, list[str]] = {
@@ -76,7 +101,11 @@ def _hits(text: str, table: dict[str, list[str]]) -> dict[str, int]:
 
 
 def label_from_tags(tags: list[str]) -> str | None:
-    """Best category from the portal's tag list; None when nothing or nothing decisive matches."""
+    """Best category from the portal's tag list; None only when nothing wins outright.
+
+    A single decisive keyword is enough. Requiring two hits discarded plainly labelled tenders,
+    such as a list naming only "Furniture" and "Seats, chairs and associated parts".
+    """
     text = " ".join(t.lower() for t in tags if t)
     if not text.strip():
         return None
@@ -84,9 +113,8 @@ def label_from_tags(tags: list[str]) -> str | None:
     if not scores:
         return None
     ranked = sorted(scores.items(), key=lambda kv: -kv[1])
-    top, top_n = ranked[0]
-    if len(ranked) == 1 or (top_n >= 2 and top_n > ranked[1][1]):
-        return top
+    if len(ranked) == 1 or ranked[0][1] > ranked[1][1]:
+        return ranked[0][0]
     return None
 
 

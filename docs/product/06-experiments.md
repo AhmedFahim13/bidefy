@@ -165,6 +165,32 @@ on 1,673 earlier securities and scored on the 423 signed later. Coverage of 79.7
 target of 80 is a band doing exactly what it promises. The earlier 83.9 percent was a band quietly
 wider than it needed to be.
 
+## What an archived detail page is actually worth
+
+The security route is so much better than the history route that the obvious move is to fetch detail
+pages for tenders that have already been awarded, not just for open ones, so the model has more of
+them to learn from. Only 5,794 of the 125,136 awards signed since September 2025 had been fetched.
+
+The first hundred pages of that crawl say what the rest will cost. The portal no longer serves every
+archived page in full:
+
+| Out of 100 archived award pages fetched | |
+|---|---|
+| Come back as a stub, with nothing on them | 53 |
+| Come back complete | 47 |
+| Of the complete ones, carry category tags | 47 of 47 |
+| Of the complete ones, publish a security | 33 of 47 |
+
+So roughly two requests buy one usable page. An earlier estimate put the security rate at 85 percent,
+taken from open tenders, and open tenders are not a fair guide: they are current, and the portal
+serves them whole. The real rate against archived awards is 33 per hundred fetched.
+
+The lever is still much the largest available. Fetching the remaining 119,342 awards in the window
+would add roughly 39,000 securities against the 2,096 on record, and roughly 56,000 category labels
+against 6,640. It is a twentyfold increase in the evidence behind the precise route and a ninefold
+increase in the category training set, and it needs no modelling at all. At one request a second it
+is about 33 hours of crawling, which is why it now has an hour of every nightly run.
+
 ## The two rejected ideas worth remembering
 
 **Keyword labels.** Adding twenty thousand labels from a keyword rule raised the published accuracy

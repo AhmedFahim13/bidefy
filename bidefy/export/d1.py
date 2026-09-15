@@ -4,13 +4,20 @@ D1's free tier counts every index entry as a row write, so the budget is measure
 rows multiplied by one plus the table's index count. The budget is per UTC day and survives
 across the two nightly runs through the watermark file. Contract awards are not loaded as rows;
 bidder and entity profiles carry precomputed JSON aggregates instead.
+
+A load only counts once D1 proves it happened. Every load ends by writing a one-off marker row,
+and the watermark moves only after that marker is read back from the database. An earlier version
+trusted wrangler's exit code, and on Linux a quoting mistake ran bare `npx`, which exits cleanly
+having done nothing: two nights of loads reported success and wrote not a single row.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
-from dataclasses import asdict, dataclass, field
+import uuid
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -21,6 +28,7 @@ BATCH_ROWS = 200                 # upper bound on rows per INSERT
 MAX_STATEMENT_BYTES = 90_000     # D1 rejects statements near 100 KB with SQLITE_TOOBIG
 DEFAULT_MAX_WRITES = 80_000      # per UTC day, leaving headroom under the 100,000 cap
 BIDDER_LOOKBACK_DAYS = 3         # bidders whose latest award is this recent get re-written
+MARKER_KEY = "d1_last_load"      # meta row that proves a load reached the database
 TABLES = {
     "tenders": ["tender_id", "reference", "status", "note", "nature", "title", "ministry", "organization",
                 "procuring_entity", "pe_id", "procurement_type", "method", "published_at", "closing_at", "fetched_at",
@@ -35,12 +43,14 @@ WRITE_WEIGHT = {"tenders": 5, "bidders": 1, "procuring_entities": 1, "prediction
 
 @dataclass
 class Watermark:
-    tenders: str = ""
+    tenders: str = ""            # archive backlog: fetched_at loaded through
     contracts: str = ""          # kept for older files; unused
-    bidders: str = ""            # last_award date loaded through
+    bidders: str = ""            # last_award date loaded through, once the first full load is done
     loaded_rows_today: int = 0
     writes_today: int = 0
     day: str = ""
+    live: str = ""               # live tenders: fetched_at loaded through
+    bidders_after: str = ""      # first full bidder load: bidder_id loaded through
 
     def save(self, path: Path) -> None:
         path = Path(path)
@@ -64,7 +74,7 @@ class Plan:
     rows: int = 0
     writes: int = 0
     watermark: Watermark = field(default_factory=Watermark)
-    skipped: dict[str, int] = field(default_factory=dict)   # table -> rows left for another day
+    skipped: dict[str, int] = field(default_factory=dict)   # part of the load -> rows left for another day
 
 
 def _sql_value(v) -> str:
@@ -102,13 +112,13 @@ def _read(root: Path, name: str) -> pl.DataFrame:
     return pl.read_parquet(path) if path.exists() else pl.DataFrame()
 
 
-def _take(plan: Plan, table: str, df: pl.DataFrame, budget: int) -> tuple[pl.DataFrame, int]:
-    """Take as many rows as the write budget allows; record what was left."""
+def _take(plan: Plan, table: str, df: pl.DataFrame, budget: int, part: str | None = None) -> tuple[pl.DataFrame, int]:
+    """Take as many rows as the write budget allows; record what was left under `part`."""
     weight = WRITE_WEIGHT[table]
-    n = min(df.height, budget // weight)
+    n = min(df.height, max(budget, 0) // weight)
     take = df.head(n)
     if n < df.height:
-        plan.skipped[table] = df.height - n
+        plan.skipped[part or table] = df.height - n
     if n:
         plan.statements += _inserts(table, take)
         plan.rows += n
@@ -117,51 +127,80 @@ def _take(plan: Plan, table: str, df: pl.DataFrame, budget: int) -> tuple[pl.Dat
 
 
 def plan_load(root: Path, watermark: Watermark, max_writes: int = DEFAULT_MAX_WRITES, today: str | None = None) -> Plan:
-    """Tenders newer than the watermark, bidders with recent awards, all entities, all predictions."""
+    """Spend the day's write budget in the order a visitor would notice the gap.
+
+    1. Live tenders fetched since the last load, on their own cursor. A notice crawled tonight must
+       reach the site tonight, not after tens of thousands of archived notices queued ahead of it.
+    2. Award bands, rewritten whole, because the model retrains every night.
+    3. Buyer profiles, rewritten whole, for the same reason.
+    4. Bidder profiles: every one once, resumably by id, then only those with a recent award.
+    5. Whatever budget is left goes to the archive backlog, oldest fetched first.
+    """
     today_d = date.fromisoformat(today) if today else date.today()
     today_s = today_d.isoformat()
     window_start = (today_d - timedelta(days=30 * WINDOW_MONTHS)).isoformat()
     used = watermark.writes_today if watermark.day == today_s else 0
-    plan = Plan(watermark=Watermark(tenders=watermark.tenders, bidders=watermark.bidders, day=today_s, writes_today=used))
+    plan = Plan(watermark=replace(watermark, day=today_s, writes_today=used, loaded_rows_today=0))
     budget = max(0, max_writes - used)
 
     tenders = _read(root, "tenders")
-    if not tenders.is_empty() and budget > 0:
+    backlog = pl.DataFrame()
+    if not tenders.is_empty():
         if "fetched_at" not in tenders.columns:
             tenders = tenders.with_columns(pl.lit("").alias("fetched_at"))
-        recent = tenders.filter(pl.col("published_at").fill_null("") >= window_start) if "published_at" in tenders.columns else tenders
-        if "status" in tenders.columns:
-            recent = pl.concat([recent, tenders.filter(pl.col("status") == "Live")]).unique(subset=["tender_id"], keep="last")
-        pending = recent.filter(pl.col("fetched_at").cast(pl.Utf8) > watermark.tenders).sort("fetched_at")
-        take, budget = _take(plan, "tenders", pending, budget)
-        if take.height:
-            plan.watermark.tenders = str(take["fetched_at"][-1])
+        tenders = tenders.with_columns(pl.col("fetched_at").cast(pl.Utf8).fill_null(""))
+        is_live = (pl.col("status") == "Live") if "status" in tenders.columns else pl.lit(False)
+        in_window = (pl.col("published_at").fill_null("") >= window_start) if "published_at" in tenders.columns else pl.lit(True)
+        live = tenders.filter(is_live & (pl.col("fetched_at") > watermark.live)).sort("fetched_at")
+        backlog = tenders.filter(in_window & ~is_live & (pl.col("fetched_at") > watermark.tenders)).sort("fetched_at")
+        if live.height:
+            take, budget = _take(plan, "tenders", live, budget, part="tenders_live")
+            if take.height:
+                plan.watermark.live = str(take["fetched_at"][-1])
+
+    for table in ("predictions", "procuring_entities"):
+        df = _read(root, table)
+        if not df.is_empty():
+            _, budget = _take(plan, table, df, budget)
 
     bidders = _read(root, "bidders")
-    if not bidders.is_empty() and budget > 0:
-        if watermark.bidders and "last_award" in bidders.columns:
+    if not bidders.is_empty():
+        bidders = bidders.with_columns(pl.col("bidder_id").cast(pl.Utf8))
+        has_award = "last_award" in bidders.columns
+        if not watermark.bidders:
+            pending = bidders.filter(pl.col("bidder_id") > watermark.bidders_after).sort("bidder_id")
+            take, budget = _take(plan, "bidders", pending, budget)
+            if take.height < pending.height:
+                if take.height:
+                    plan.watermark.bidders_after = str(take["bidder_id"][-1])
+            else:
+                newest = bidders["last_award"].cast(pl.Utf8).drop_nulls() if has_award else pl.Series([], dtype=pl.Utf8)
+                plan.watermark.bidders = str(newest.max()) if newest.len() else today_s
+                plan.watermark.bidders_after = ""
+        elif has_award:
             since = (date.fromisoformat(watermark.bidders) - timedelta(days=BIDDER_LOOKBACK_DAYS)).isoformat()
-            pending = bidders.filter(pl.col("last_award").fill_null("") >= since)
-        else:
-            pending = bidders
-        pending = pending.sort("last_award", descending=True, nulls_last=True)
-        take, budget = _take(plan, "bidders", pending, budget)
-        if take.height and "last_award" in take.columns:
-            newest = take["last_award"].drop_nulls()
-            if newest.len() and not plan.skipped.get("bidders"):
-                plan.watermark.bidders = str(newest.max())
-            elif watermark.bidders:
-                plan.watermark.bidders = watermark.bidders
+            pending = (bidders.filter(pl.col("last_award").cast(pl.Utf8).fill_null("") >= since)
+                       .sort("last_award", descending=True, nulls_last=True))
+            take, budget = _take(plan, "bidders", pending, budget)
+            newest = take["last_award"].cast(pl.Utf8).drop_nulls()
+            if take.height == pending.height and newest.len():
+                plan.watermark.bidders = max(str(newest.max()), watermark.bidders)
 
-    for table in ("procuring_entities", "predictions"):
-        df = _read(root, table)
-        if df.is_empty() or budget <= 0:
-            continue
-        _, budget = _take(plan, table, df, budget)
+    if backlog.height:
+        take, budget = _take(plan, "tenders", backlog, budget, part="tenders_backlog")
+        if take.height:
+            plan.watermark.tenders = str(take["fetched_at"][-1])
 
     plan.watermark.loaded_rows_today = plan.rows
     plan.watermark.writes_today = used + plan.writes
     return plan
+
+
+def add_marker(plan: Plan, token: str) -> None:
+    """End the load with a row that can only exist in D1 if every statement before it ran."""
+    plan.statements.append(f"INSERT OR REPLACE INTO meta (key, value) VALUES ('{MARKER_KEY}', {_sql_value(token)});")
+    plan.writes += 1
+    plan.watermark.writes_today += 1
 
 
 def write_sql(plan: Plan, out_dir: Path, statements_per_file: int = 20) -> list[Path]:
@@ -177,14 +216,54 @@ def write_sql(plan: Plan, out_dir: Path, statements_per_file: int = 20) -> list[
     return files
 
 
-def execute(files: list[Path], database: str, remote: bool, runner=subprocess.run) -> None:
+def _wrangler(args: list[str], runner):
+    """Run wrangler with every argument passed through intact.
+
+    Never shell=True with a list: on Linux that runs only the first element, bare `npx`, and the
+    shell swallows the rest. Resolving the executable instead works on Windows too, where npx is a
+    .cmd file.
+    """
+    exe = shutil.which("npx") or "npx"
+    return runner([exe, "wrangler", *args], cwd="worker", capture_output=True, encoding="utf-8", errors="replace")
+
+
+def _results(stdout: str | None) -> list[dict]:
+    """The JSON wrangler prints under --json, or an error if it printed none or reported a failure."""
+    text = (stdout or "").strip()
+    try:
+        data = json.loads(text)
+    except ValueError:
+        start = text.find("\n[")
+        try:
+            data = json.loads(text[start + 1:]) if start >= 0 else None
+        except ValueError:
+            data = None
+        if data is None:
+            raise RuntimeError("wrangler printed no JSON result") from None
+    if not isinstance(data, list) or not data or not all(isinstance(d, dict) and d.get("success") for d in data):
+        raise RuntimeError("wrangler did not report success for every statement")
+    return data
+
+
+def execute(files: list[Path], database: str, remote: bool, marker: str = "", runner=subprocess.run) -> None:
+    target = "--remote" if remote else "--local"
     for path in files:
-        cmd = ["npx", "wrangler", "d1", "execute", database, "--remote" if remote else "--local",
-               "--file", str(Path(path).resolve()), "--yes"]
-        result = runner(cmd, cwd="worker", shell=True, capture_output=True, encoding="utf-8", errors="replace")
+        result = _wrangler(["d1", "execute", database, target, "--file", str(Path(path).resolve()), "--yes", "--json"], runner)
         if result.returncode != 0:
             detail = ((result.stderr or "") + (result.stdout or ""))[-2000:]
             raise RuntimeError(f"wrangler failed on {Path(path).name}: {detail}")
+        try:
+            _results(result.stdout)
+        except RuntimeError as e:
+            raise RuntimeError(f"wrangler did not confirm {Path(path).name}: {e}") from None
+    if marker:
+        result = _wrangler(["d1", "execute", database, target, "--command",
+                            f"SELECT value FROM meta WHERE key = '{MARKER_KEY}'", "--yes", "--json"], runner)
+        if result.returncode != 0:
+            raise RuntimeError(f"could not read the load marker back: {((result.stderr or '') + (result.stdout or ''))[-500:]}")
+        rows = _results(result.stdout)[0].get("results") or []
+        if not rows or rows[0].get("value") != marker:
+            raise RuntimeError("the load marker is not in D1, so the statements before it did not land")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -198,6 +277,10 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     wm = Watermark.load(Path(a.watermark))
     plan = plan_load(Path(a.data_root), wm, max_writes=a.max_writes)
+    marker = ""
+    if plan.statements:
+        marker = f"{plan.watermark.day}-{uuid.uuid4().hex[:12]}"
+        add_marker(plan, marker)
     files = write_sql(plan, Path("build") / "d1")
     left = ", ".join(f"{k} {v} rows deferred" for k, v in plan.skipped.items()) or "nothing deferred"
     print(f"d1 load: {plan.rows} rows, about {plan.writes} writes ({plan.watermark.writes_today} today), "
@@ -205,13 +288,15 @@ def main(argv: list[str] | None = None) -> int:
     if a.dry_run or not files:
         return 0
     try:
-        execute(files, a.database, remote=not a.local)
+        execute(files, a.database, remote=not a.local, marker=marker)
     except RuntimeError as e:
         # A blocked or failed load must not fail the nightly job or move the watermark.
         print(f"d1 load: skipped, {str(e)[:300]}")
         return 0
     plan.watermark.save(Path(a.watermark))
-    print(f"d1 load: done, watermark tenders={plan.watermark.tenders} bidders={plan.watermark.bidders}")
+    bidders = plan.watermark.bidders or f"first load through {plan.watermark.bidders_after or 'none yet'}"
+    print(f"d1 load: done and confirmed in D1, watermark live={plan.watermark.live} "
+          f"tenders={plan.watermark.tenders} bidders={bidders}")
     return 0
 
 

@@ -34,7 +34,7 @@ within the free tier's 100,000 row writes a day.
 cd worker && npm install && npm test && npm run typecheck
 npm run schema:remote          # once
 npx wrangler deploy
-cd .. && uv run python -m bidefy.export.d1 --max-rows 90000   # nightly-sized load
+cd .. && uv run python -m bidefy.export.d1 --max-writes 40000   # one nightly run: writes, counting index entries
 ```
 
 ## Web app

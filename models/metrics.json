@@ -1,98 +1,98 @@
 {
   "category_classifier": {
     "accuracy_acted": 0.93,
-    "deferral_rate": 0.4429,
-    "coverage": 0.5571,
-    "accuracy_all": 0.7607,
-    "macro_f1": 0.6406,
-    "n_labels": 9706,
+    "deferral_rate": 0.4353,
+    "coverage": 0.5647,
+    "accuracy_all": 0.7642,
+    "macro_f1": 0.6399,
+    "n_labels": 11158,
     "n_classes": 15,
     "classes_dropped_for_sparsity": [],
-    "threshold": 0.8565,
+    "threshold": 0.8588,
     "target_accuracy": 0.93,
     "evaluation": "cross-validated on portal category tags only, entity priors from the training fold",
     "brief_dropout": 0.3,
     "min_train_margin": 1,
     "repeats": 3,
-    "deferral_spread": 0.0083,
-    "macro_f1_spread": 0.0042,
+    "deferral_spread": 0.0125,
+    "macro_f1_spread": 0.0108,
     "scored_with_brief": true,
-    "trained_at": "2026-09-14T16:05:30Z",
-    "deferral_for_93": 0.4429,
-    "deferral_for_95": 0.5336,
-    "deferral_for_97": 0.6554
+    "trained_at": "2026-09-15T02:26:29Z",
+    "deferral_for_93": 0.4353,
+    "deferral_for_95": 0.5199,
+    "deferral_for_97": 0.6449
   },
   "award_value_model": {
-    "mape_acted": 0.3745,
-    "mape_naive_median": 0.7785,
-    "coverage_80": 0.7762,
-    "deferral_rate": 0.1939,
-    "band_width_median": 4.94,
-    "band_width_p25": 3.44,
-    "band_width_p75": 6.96,
+    "mape_acted": 0.3688,
+    "mape_naive_median": 0.779,
+    "coverage_80": 0.7757,
+    "deferral_rate": 0.1933,
+    "band_width_median": 4.9,
+    "band_width_p25": 3.39,
+    "band_width_p75": 6.93,
     "unconditional_spread": 48.1,
     "deferral_at_band_limit": {
-      "4": 0.7141,
-      "6": 0.465,
-      "8": 0.2929,
-      "12": 0.1352,
-      "20": 0.0436
+      "4": 0.7062,
+      "6": 0.4616,
+      "8": 0.2934,
+      "12": 0.1358,
+      "20": 0.0433
     },
-    "history_n": 137262,
-    "history_n_including_declined": 171287,
-    "history_mape": 0.3868,
-    "history_coverage_80": 0.7754,
-    "history_band_width_median": 5.04,
+    "history_n": 136266,
+    "history_n_including_declined": 170187,
+    "history_mape": 0.3847,
+    "history_coverage_80": 0.7742,
+    "history_band_width_median": 5.03,
     "history_mape_ci95": [
-      0.3844,
-      0.3894
+      0.3822,
+      0.3872
     ],
     "history_coverage_ci95": [
-      0.7732,
-      0.7778
+      0.7723,
+      0.7764
     ],
     "history_by_method": {
       "LTM": {
-        "n_acted": 73129,
-        "mape": 0.3324,
-        "coverage_80": 0.8009,
-        "band_width_median": 4.27,
-        "deferral_rate": 0.0521
+        "n_acted": 72804,
+        "mape": 0.3313,
+        "coverage_80": 0.799,
+        "band_width_median": 4.23,
+        "deferral_rate": 0.0562
       },
       "OTM": {
-        "n_acted": 51640,
-        "mape": 0.4665,
-        "coverage_80": 0.7475,
+        "n_acted": 50728,
+        "mape": 0.4626,
+        "coverage_80": 0.747,
         "band_width_median": 6.25,
-        "deferral_rate": 0.3054
+        "deferral_rate": 0.3076
       },
       "RFQU": {
-        "n_acted": 6995,
-        "mape": 0.4567,
-        "coverage_80": 0.7387,
-        "band_width_median": 5.79,
-        "deferral_rate": 0.2484
+        "n_acted": 7117,
+        "mape": 0.4577,
+        "coverage_80": 0.7347,
+        "band_width_median": 5.8,
+        "deferral_rate": 0.2353
       },
       "RFQ": {
-        "n_acted": 4439,
-        "mape": 0.4267,
-        "coverage_80": 0.7457,
-        "band_width_median": 5.1,
-        "deferral_rate": 0.451
+        "n_acted": 4584,
+        "mape": 0.4239,
+        "coverage_80": 0.7472,
+        "band_width_median": 5.22,
+        "deferral_rate": 0.433
       },
       "RFQL": {
-        "n_acted": 482,
-        "mape": 0.4325,
-        "coverage_80": 0.8195,
-        "band_width_median": 5.98,
-        "deferral_rate": 0.4504
+        "n_acted": 492,
+        "mape": 0.4175,
+        "coverage_80": 0.8089,
+        "band_width_median": 6.37,
+        "deferral_rate": 0.439
       },
       "DPM": {
-        "n_acted": 475,
-        "mape": 0.5576,
-        "coverage_80": 0.6926,
-        "band_width_median": 7.53,
-        "deferral_rate": 0.2508
+        "n_acted": 424,
+        "mape": 0.5894,
+        "coverage_80": 0.7264,
+        "band_width_median": 8.47,
+        "deferral_rate": 0.3312
       }
     },
     "projection_method_mix": {
@@ -100,15 +100,15 @@
       "OTM": 0.9936
     },
     "live_security_share": 0.8484581497797357,
-    "expected_mape_on_open_tenders": 0.1021,
-    "expected_coverage_on_open_tenders": 0.7917,
+    "expected_mape_on_open_tenders": 0.1015,
+    "expected_coverage_on_open_tenders": 0.8011,
     "expected_band_width_on_open_tenders": 1.44,
-    "security_route_n_total": 4235,
-    "security_n": 848,
-    "security_fitted_on": 3387,
-    "security_test_from": "2026-07-12",
-    "security_mape": 0.0868,
-    "security_coverage_80": 0.8019,
+    "security_route_n_total": 5335,
+    "security_n": 1073,
+    "security_fitted_on": 4262,
+    "security_test_from": "2026-07-02",
+    "security_mape": 0.0861,
+    "security_coverage_80": 0.8034,
     "security_band_width_median": 1.43,
     "drift_allowance": 0.04,
     "n_fit": 701561,
@@ -116,7 +116,7 @@
     "n_test": 175522,
     "test_from": "2025-03-19",
     "train_last_signed": "2025-03-18",
-    "trained_at": "2026-09-14T16:24:27Z",
-    "model_version": "award-20260914"
+    "trained_at": "2026-09-15T02:47:30Z",
+    "model_version": "award-20260915"
   }
 }

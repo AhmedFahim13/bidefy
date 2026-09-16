@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import polars as pl
@@ -5,6 +6,7 @@ import polars as pl
 from bidefy.export import d1
 
 OK = '[{"results": [], "success": true, "meta": {"duration": 1}}]'
+NEVER_SLEEP = lambda seconds: None      # noqa: E731 - keeps the retry tests instant
 
 
 def _tender(tid: str, status: str, published: str, fetched: str, title: str = "t") -> dict:
@@ -38,6 +40,23 @@ def _file(tmp_path: Path, name: str = "a.sql") -> Path:
     f = tmp_path / name
     f.write_text("x", encoding="utf-8")
     return f
+
+
+def _runner(marker_value: str = "m1", fail_first: int = 0):
+    """A fake wrangler: fails the first `fail_first` file loads, then answers normally."""
+    calls: list[tuple[list[str], dict]] = []
+    left = {"n": fail_first}
+
+    def runner(cmd, **kw):
+        calls.append((cmd, kw))
+        if "--command" in cmd:
+            return R(stdout=json.dumps([{"results": [{"value": marker_value}], "success": True}]))
+        if left["n"]:
+            left["n"] -= 1
+            return R(1, stdout="partial", stderr="spinner text")
+        return R()
+
+    return runner, calls
 
 
 def test_plan_counts_writes_with_index_weights(tmp_path: Path):
@@ -146,28 +165,46 @@ def test_add_marker_counts_one_write(tmp_path: Path):
 
 
 def test_execute_never_hands_a_list_to_the_shell(tmp_path: Path):
-    calls = []
-
-    def runner(cmd, **kw):
-        calls.append((cmd, kw))
-        if "--command" in cmd:
-            return R(stdout='[{"results": [{"value": "m1"}], "success": true}]')
-        return R()
-
-    d1.execute([_file(tmp_path)], "bidefy", remote=True, marker="m1", runner=runner)
+    runner, calls = _runner()
+    d1.execute([_file(tmp_path)], "bidefy", remote=True, marker="m1", runner=runner, sleep=NEVER_SLEEP)
     assert len(calls) == 2
     for cmd, kw in calls:
         assert not kw.get("shell")
         assert cmd[1:4] == ["wrangler", "d1", "execute"] and "--json" in cmd and "--remote" in cmd
 
 
+def test_execute_retries_a_batch_that_failed_mid_upload(tmp_path: Path):
+    """D1 rolls a failed import back, and every statement is idempotent, so a retry is safe."""
+    runner, calls = _runner(fail_first=1)
+    d1.execute([_file(tmp_path)], "bidefy", remote=True, marker="m1", runner=runner, sleep=NEVER_SLEEP)
+    assert len(calls) == 3          # the batch twice, then the marker read-back
+
+
+def test_execute_gives_up_after_the_retry_limit_and_says_why(tmp_path: Path):
+    calls = []
+
+    def runner(cmd, **kw):
+        calls.append(cmd)
+        return R(1, stdout="partial output", stderr="spinner text")
+
+    try:
+        d1.execute([_file(tmp_path)], "bidefy", remote=True, runner=runner, sleep=NEVER_SLEEP)
+        assert False, "expected RuntimeError"
+    except RuntimeError as e:
+        msg = str(e)
+        assert "a.sql failed after 3 attempts" in msg
+        assert "exit 1" in msg and "spinner text" in msg and "partial output" in msg
+    assert len(calls) == d1.RETRIES
+
+
 def test_execute_rejects_a_clean_exit_that_printed_nothing(tmp_path: Path):
     """The production failure: bare npx ran, exited 0, and not one statement executed."""
     try:
-        d1.execute([_file(tmp_path)], "bidefy", remote=True, marker="m1", runner=lambda cmd, **kw: R(stdout=""))
+        d1.execute([_file(tmp_path)], "bidefy", remote=True, marker="m1",
+                   runner=lambda cmd, **kw: R(stdout=""), sleep=NEVER_SLEEP)
         assert False, "expected RuntimeError"
     except RuntimeError as e:
-        assert "a.sql" in str(e)
+        assert "a.sql failed after 3 attempts" in str(e) and "no JSON result" in str(e)
 
 
 def test_execute_rejects_a_load_whose_marker_is_missing(tmp_path: Path):
@@ -177,23 +214,23 @@ def test_execute_rejects_a_load_whose_marker_is_missing(tmp_path: Path):
         return R()
 
     try:
-        d1.execute([_file(tmp_path)], "bidefy", remote=True, marker="m1", runner=runner)
+        d1.execute([_file(tmp_path)], "bidefy", remote=True, marker="m1", runner=runner, sleep=NEVER_SLEEP)
         assert False, "expected RuntimeError"
     except RuntimeError as e:
         assert "marker" in str(e)
 
 
-def test_execute_raises_on_wrangler_failure(tmp_path: Path):
+def test_execute_reports_which_file_failed(tmp_path: Path):
     calls = []
 
     def runner(cmd, **kw):
         calls.append(cmd)
-        return R(0 if len(calls) == 1 else 1, stderr="boom")
+        return R(0 if any("a.sql" in str(c) for c in cmd) else 1, stderr="boom")
 
     f1, f2 = _file(tmp_path, "a.sql"), _file(tmp_path, "b.sql")
     try:
-        d1.execute([f1, f2], "bidefy", remote=True, runner=runner)
+        d1.execute([f1, f2], "bidefy", remote=True, runner=runner, sleep=NEVER_SLEEP)
         assert False, "expected RuntimeError"
     except RuntimeError as e:
         assert "b.sql" in str(e)
-    assert len(calls) == 2 and "--remote" in calls[0]
+    assert len(calls) == 1 + d1.RETRIES and "--remote" in calls[0]

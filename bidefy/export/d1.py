@@ -16,6 +16,7 @@ import argparse
 import json
 import shutil
 import subprocess
+import time
 import uuid
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, timedelta
@@ -29,6 +30,8 @@ MAX_STATEMENT_BYTES = 90_000     # D1 rejects statements near 100 KB with SQLITE
 DEFAULT_MAX_WRITES = 80_000      # per UTC day, leaving headroom under the 100,000 cap
 BIDDER_LOOKBACK_DAYS = 3         # bidders whose latest award is this recent get re-written
 MARKER_KEY = "d1_last_load"      # meta row that proves a load reached the database
+RETRIES = 3                      # a remote batch can fail mid-upload; D1 rolls it back, so retry
+RETRY_PAUSE_SECONDS = 5          # multiplied by the attempt number
 TABLES = {
     "tenders": ["tender_id", "reference", "status", "note", "nature", "title", "ministry", "organization",
                 "procuring_entity", "pe_id", "procurement_type", "method", "published_at", "closing_at", "fetched_at",
@@ -245,23 +248,51 @@ def _results(stdout: str | None) -> list[dict]:
     return data
 
 
-def execute(files: list[Path], database: str, remote: bool, marker: str = "", runner=subprocess.run) -> None:
+def _detail(result) -> str:
+    """Everything wrangler said, labelled, so the next failure explains itself.
+
+    The first production failure reported only the progress line "Checking if file needs
+    uploading", because the message kept the tail of the two streams glued together and a spinner
+    was the last thing written to them.
+    """
+    out = (result.stdout or "").strip()
+    err = (result.stderr or "").strip()
+    return f"exit {result.returncode}; stderr: {err[-800:] or 'empty'}; stdout: {out[-800:] or 'empty'}"
+
+
+def _attempt(args: list[str], runner, what: str, sleep) -> list[dict]:
+    """Run wrangler until it reports success, a few times, and return what it reported.
+
+    A remote file load can fail part way through its upload. D1 returns the database to its
+    previous state when that happens, and every statement here is an INSERT OR REPLACE, so
+    repeating a batch is safe and costs only the writes it repeats.
+    """
+    last = ""
+    for attempt in range(1, RETRIES + 1):
+        result = _wrangler(args, runner)
+        if result.returncode == 0:
+            try:
+                return _results(result.stdout)
+            except RuntimeError as e:
+                last = f"{e}; {_detail(result)}"
+        else:
+            last = _detail(result)
+        if attempt < RETRIES:
+            sleep(RETRY_PAUSE_SECONDS * attempt)
+    raise RuntimeError(f"{what} failed after {RETRIES} attempts: {last}")
+
+
+def execute(files: list[Path], database: str, remote: bool, marker: str = "",
+            runner=subprocess.run, sleep=time.sleep) -> None:
     target = "--remote" if remote else "--local"
     for path in files:
-        result = _wrangler(["d1", "execute", database, target, "--file", str(Path(path).resolve()), "--yes", "--json"], runner)
-        if result.returncode != 0:
-            detail = ((result.stderr or "") + (result.stdout or ""))[-2000:]
-            raise RuntimeError(f"wrangler failed on {Path(path).name}: {detail}")
-        try:
-            _results(result.stdout)
-        except RuntimeError as e:
-            raise RuntimeError(f"wrangler did not confirm {Path(path).name}: {e}") from None
+        _attempt(["d1", "execute", database, target, "--file", str(Path(path).resolve()), "--yes", "--json"],
+                 runner, Path(path).name, sleep)
     if marker:
-        result = _wrangler(["d1", "execute", database, target, "--command",
-                            f"SELECT value FROM meta WHERE key = '{MARKER_KEY}'", "--yes", "--json"], runner)
-        if result.returncode != 0:
-            raise RuntimeError(f"could not read the load marker back: {((result.stderr or '') + (result.stdout or ''))[-500:]}")
-        rows = _results(result.stdout)[0].get("results") or []
+        results = _attempt(["d1", "execute", database, target, "--command",
+                            f"SELECT value FROM meta WHERE key = '{MARKER_KEY}'", "--yes", "--json"],
+                           runner, "the load marker read-back", sleep)
+        rows = results[0].get("results") or []
         if not rows or rows[0].get("value") != marker:
             raise RuntimeError("the load marker is not in D1, so the statements before it did not land")
 
@@ -291,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
         execute(files, a.database, remote=not a.local, marker=marker)
     except RuntimeError as e:
         # A blocked or failed load must not fail the nightly job or move the watermark.
-        print(f"d1 load: skipped, {str(e)[:300]}")
+        print(f"d1 load: skipped, {str(e)[:900]}")
         return 0
     plan.watermark.save(Path(a.watermark))
     bidders = plan.watermark.bidders or f"first load through {plan.watermark.bidders_after or 'none yet'}"

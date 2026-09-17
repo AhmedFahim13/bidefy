@@ -4,13 +4,16 @@ from __future__ import annotations
 import re
 
 CATEGORIES = [
-    "roads_bridges", "buildings_civil", "water_sanitation", "electrical_power", "it_equipment",
+    "construction", "roads_bridges", "buildings_civil", "water_sanitation", "electrical_power", "it_equipment",
     "office_supplies", "furniture", "medical", "vehicles_transport", "food_catering",
     "textiles_uniforms", "printing_media", "security_cleaning_services", "consultancy",
     "agriculture_environment",
 ]
 
+# "construction" is the sector; roads, buildings and water are its types, shown only where the
+# buyer's CPV codes state one. Most construction tenders tick the whole division and state none.
 LABELS = {
+    "construction": "Construction works",
     "roads_bridges": "Roads and bridges",
     "buildings_civil": "Buildings and civil works",
     "water_sanitation": "Water and sanitation",

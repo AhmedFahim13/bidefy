@@ -1,5 +1,6 @@
 import { buildPushPayload, type PushSubscription, type VapidKeys } from "@block65/webcrypto-web-push";
 import type { Filter } from "./subscriptions";
+import { categoryMatches } from "./query";
 
 export type TenderLite = {
   tender_id: string;
@@ -34,7 +35,7 @@ function rowMatches(t: TenderLite, f: Filter): boolean {
     if (k === "q" && !(t.title ?? "").toLowerCase().includes(want.toLowerCase())) return false;
     if (k === "ministry" && (t.ministry ?? "") !== want) return false;
     if (k === "status" && (t.status ?? "") !== want) return false;
-    if (k === "category" && (t.category ?? "") !== want) return false;
+    if (k === "category" && !categoryMatches(t.category, want)) return false;
     if (k === "district") return false; // tenders carry no district; district filters apply to awards later
   }
   return true;

@@ -2,7 +2,8 @@ from bidefy.models.categories import CATEGORIES, LABELS, label_from_tags, label_
 
 
 def test_categories_are_stable_slugs():
-    assert len(CATEGORIES) == 15 and all(c == c.lower() and " " not in c for c in CATEGORIES)
+    assert len(CATEGORIES) == 16 and all(c == c.lower() and " " not in c for c in CATEGORIES)
+    assert "construction" in CATEGORIES
     assert set(LABELS) == set(CATEGORIES)
 
 

@@ -149,10 +149,23 @@ def main() -> None:
     if cat:
         add("## Category")
         add("")
-        add("A tender's category is read from the portal's own tags wherever Bidefy has fetched that "
-            "tender's detail page. The model below exists only to cover tenders whose detail page has "
-            "not been fetched, mostly older archived ones.")
+        add("Categories are read from the portal's CPV procurement codes, through the official code "
+            "hierarchy. Most buyers tick the whole construction division rather than a kind of work, so "
+            "construction is one category, and roads, buildings or water is shown only where the "
+            "buyer's codes state it. The model below covers tenders whose detail page has not been "
+            "fetched, mostly older archived ones.")
         add("")
+        coverage = cat.get("truth_coverage")
+        if coverage is not None:
+            add(f"Of the {cat.get('n_tagged', 0):,} tenders with codes on record, {pct(coverage)} carry "
+                "codes that identify a sector. The rest were ticked so broadly that the codes say "
+                "nothing about what is being bought. There is no ground truth to score those against, "
+                "so they are not in the figures below, and that has to be said before the figures are "
+                "read. An earlier model scored all of them against keyword labels across fifteen "
+                "categories and declined 38.5 percent at the same 93 percent accuracy. The experiment "
+                "log measures how much of the difference is this change of scope rather than a better "
+                "model: most of it.")
+            add("")
         live = live_category_sources()
         if live:
             count, share = live

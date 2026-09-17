@@ -13,12 +13,13 @@ WORDS = {
     "furniture": ["furniture", "chair", "table", "almirah", "desk", "sofa"],
     "food_catering": ["rice", "food", "catering", "meal", "ration", "kitchen"],
 }
+# Real CPV descriptions, as the portal lists them: labels are read through the official code list.
 TAGS = {
-    "roads_bridges": ["Road-repair works", "Construction work for highways"],
+    "roads_bridges": ["Construction work for highways, roads", "Surface work for roads"],
     "medical": ["Pharmaceutical products", "Medical equipments"],
     "it_equipment": ["Computer equipment and supplies", "Software"],
     "furniture": ["Furniture", "Office furniture"],
-    "food_catering": ["Food, beverages", "Catering services"],
+    "food_catering": ["Food, beverages, tobacco and related products", "Catering services"],
 }
 
 

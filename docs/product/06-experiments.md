@@ -205,6 +205,13 @@ This also corrects the section above. The label was not what limited the model i
 section claimed: fixing the labeller's substring errors made the labels more truthful without making
 the tenders easier to classify.
 
+**Adopted: sectors, scored where the codes support them.** Bidefy now reads categories as thirteen
+sectors from the CPV codes, and shows construction's type only where the buyer stated it. The CPV
+labels were chosen over the merged keyword labels despite scoring 1.7 points worse on the same task:
+every CPV label traces to an official code, while the keyword labels carry errors anyone can find in
+minutes, such as site preparation filed under food. The accuracy page states which tenders the
+figure covers, and the fifteen-category figure stays here beside it.
+
 ## What an archived detail page is actually worth
 
 The security route is so much better than the history route that the obvious move is to fetch detail

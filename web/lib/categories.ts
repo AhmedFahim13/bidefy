@@ -1,4 +1,5 @@
 export const CATEGORY_LABELS: Record<string, string> = {
+  construction: "Construction works",
   roads_bridges: "Roads and bridges",
   buildings_civil: "Buildings and civil works",
   water_sanitation: "Water and sanitation",

@@ -9,7 +9,7 @@ import polars as pl
 
 from ..crawler import store
 from ..models import award, classifier
-from ..models.categories import label_from_tags
+from ..models import cpv
 from ..models import flags as flagmod
 from . import resolve as r
 from .names import normalize_name
@@ -85,7 +85,11 @@ def _briefs(data_root: Path) -> dict[str, str]:
 
 
 def _tag_categories(data_root: Path) -> dict[str, str]:
-    """The portal's own category tags, mapped to Bidefy categories. Authoritative where present."""
+    """The portal's own CPV codes, read as a Bidefy category. Authoritative where present.
+
+    A construction tender gets roads, buildings or water only when its codes state which; otherwise
+    it is plain construction. Codes that identify no sector at all leave the tender to the model.
+    """
     details = store.load_all(Path(data_root), "details")
     if details.is_empty() or "categories" not in details.columns:
         return {}
@@ -95,7 +99,8 @@ def _tag_categories(data_root: Path) -> dict[str, str]:
             tags = json.loads(raw or "[]")
         except json.JSONDecodeError:
             continue
-        label = label_from_tags(tags)
+        got = cpv.label(tags)
+        label = got.category or got.sector
         if label:
             out[str(tid)] = label
     return out

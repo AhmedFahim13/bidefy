@@ -40,7 +40,7 @@ FALLBACK_THRESHOLD = 0.60
 MIN_LABELS = 60
 MIN_PER_CLASS = 5
 FOLDS = 5
-BUNDLE_FORMAT = 4
+BUNDLE_FORMAT = 5           # 5: thirteen CPV sectors; a fifteen-category bundle must not be served
 BRIEF_DROPOUT = 0.3        # so the model still works for tenders whose detail page is unfetched
 MIN_TRAIN_MARGIN = 1       # 1 means no filtering. Training only on decisive labels was measured
                            # to be much worse: it cost 9 points of deferral and 7 of macro F1.
@@ -48,8 +48,11 @@ REPEATS = 3                # the same cross-validation, run this many times and 
                            # it swings 1.7 points of deferral on identical data and an identical
                            # seed, so a single run cannot tell a real change from its own noise.
 ENTITY_PRIOR_WEIGHT = 1.0   # a buyer's own history, combined with the text model as evidence
-LABELLER = "keywords"       # "keywords" (substring rules), "cpv_sector" or "cpv_fine"; see models/cpv.py
-USE_NATURE = False          # add the notice's declared Goods/Works/Services and method to the text
+# Thirteen sectors read from the portal's CPV codes. The fifteen-category keyword labels declined
+# 38.5 percent; sectors decline 18.3 percent, and the experiment log shows how much of that is a
+# change of scope rather than a better model. "keywords" and "cpv_fine" remain for comparison.
+LABELLER = "cpv_sector"
+USE_NATURE = True           # add the notice's declared Goods/Works/Services and method to the text
 
 
 def _label(tags: list[str]) -> tuple[str | None, int]:
@@ -59,6 +62,26 @@ def _label(tags: list[str]) -> tuple[str | None, int]:
         return label, (label_margin(tags) if label else 0)
     got = cpv.label(tags)
     return (got.sector if LABELLER == "cpv_sector" else got.category), got.margin
+
+
+def _truth_coverage(data_root: Path) -> dict:
+    """How many tenders carry codes at all, and what share of them yield a label to score against.
+
+    Published beside the accuracy, because tenders whose codes say nothing are left out of it.
+    """
+    details = store.load_all(Path(data_root), "details")
+    if details.is_empty() or "categories" not in details.columns:
+        return {}
+    tagged = labelled = 0
+    for (raw,) in details.select("categories").iter_rows():
+        try:
+            tags = json.loads(raw or "[]")
+        except json.JSONDecodeError:
+            continue
+        if tags:
+            tagged += 1
+            labelled += _label(tags)[0] is not None
+    return {"n_tagged": tagged, "truth_coverage": round(labelled / tagged, 4) if tagged else None}
 
 
 def _slug(value) -> str:
@@ -273,7 +296,9 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
         "classes_dropped_for_sparsity": dropped,
         "threshold": round(threshold, 4),
         "target_accuracy": target_accuracy,
-        "evaluation": "cross-validated on portal category tags only, entity priors from the training fold",
+        "evaluation": ("cross-validated against the sector the portal's CPV codes identify, on tenders whose "
+                       "codes identify one, with buyer priors from the training fold only"),
+        **_truth_coverage(Path(data_root)),
         "brief_dropout": BRIEF_DROPOUT,
         "min_train_margin": MIN_TRAIN_MARGIN,
         "labeller": LABELLER,

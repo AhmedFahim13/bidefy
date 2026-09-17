@@ -3,6 +3,15 @@ export type Query = { sql: string; params: (string | number)[] };
 
 const MAX_SIZE = 100;
 
+/** Construction and its types. Most construction tenders state no type, so they are plain "construction". */
+export const CONSTRUCTION_TYPES = ["construction", "roads_bridges", "buildings_civil", "water_sanitation"];
+
+/** Asking for construction finds every construction tender; asking for a type finds only that type. */
+export function categoryMatches(have: string | null | undefined, want: string): boolean {
+  if (want === "construction") return CONSTRUCTION_TYPES.includes(have ?? "");
+  return (have ?? "") === want;
+}
+
 export function parseTenderFilters(sp: URLSearchParams): TenderFilters {
   const page = Math.max(1, Number.parseInt(sp.get("page") ?? "1", 10) || 1);
   const size = Math.min(MAX_SIZE, Math.max(1, Number.parseInt(sp.get("size") ?? "25", 10) || 25));
@@ -23,7 +32,13 @@ export function tenderListQuery(f: TenderFilters): Query {
   if (f.status !== "all") { where.push("status = ?"); params.push(f.status); }
   if (f.q) { where.push("title LIKE ?"); params.push(`%${f.q}%`); }
   if (f.ministry) { where.push("ministry = ?"); params.push(f.ministry); }
-  if (f.category) { where.push("category = ?"); params.push(f.category); }
+  if (f.category === "construction") {
+    where.push(`category IN (${CONSTRUCTION_TYPES.map(() => "?").join(", ")})`);
+    params.push(...CONSTRUCTION_TYPES);
+  } else if (f.category) {
+    where.push("category = ?");
+    params.push(f.category);
+  }
   const sql =
     "SELECT tender_id, reference, status, nature, title, ministry, organization, procuring_entity, pe_id, method, published_at, closing_at, category, category_confidence " +
     "FROM tenders" + (where.length ? " WHERE " + where.join(" AND ") : "") +

@@ -2,9 +2,9 @@
   "tenders": "",
   "contracts": "",
   "bidders": "",
-  "loaded_rows_today": 40000,
-  "writes_today": 40001,
+  "loaded_rows_today": 23331,
+  "writes_today": 80001,
   "day": "2026-09-17",
-  "live": "",
-  "bidders_after": "e31455d8a76a"
+  "live": "20260915T224356175757Z",
+  "bidders_after": "fa84cceecb89"
 }

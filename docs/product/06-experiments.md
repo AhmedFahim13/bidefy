@@ -165,6 +165,46 @@ on 1,673 earlier securities and scored on the 423 signed later. Coverage of 79.7
 target of 80 is a band doing exactly what it promises. The earlier 83.9 percent was a band quietly
 wider than it needed to be.
 
+### Where the 39 percent actually comes from
+
+The category model declined 38.5 percent of tenders at 93 percent accuracy, and the target was 15.
+Three ways of improving the model itself were tested, then two ways of changing what is measured,
+all pooled over three cross-validations on the same day's data.
+
+| Variant | Tenders scored | Classes | Declines at 93% | Declines at 95% | Accuracy if forced | Macro F1 |
+|---|---|---|---|---|---|---|
+| The published model | 17,869 | 15 | 38.5% | 47.9% | 77.8% | 0.655 |
+| Plus the declared Goods/Works/Services and method | 17,869 | 15 | 38.5% | 47.6% | 78.1% | 0.657 |
+| CPV fine labels, with nature and method | 11,363 | 15 | 37.4% | 44.9% | 79.0% | 0.719 |
+| Multilingual sentence embeddings, CPV sectors | 16,644 | 13 | 23.9% | 31.0% | 83.1% | 0.599 |
+| Embeddings and word counts blended 50/50 | 16,644 | 13 | 19.5% | 26.0% | 84.8% | 0.662 |
+| Word counts, CPV sector labels, with nature | 16,644 | 13 | 18.3% | 24.6% | 85.1% | 0.683 |
+| Old labels, only tenders the CPV labeller can label | 14,595 | 15 | 22.8% | 30.9% | 83.6% | 0.664 |
+| Old labels merged to sectors, same tenders, with nature | 14,429 | 13 | 16.6% | 23.1% | 85.7% | 0.701 |
+
+**Nothing that changes the model moved the 15-category task.** The declared nature and method added
+a tenth of a point. Reading labels from the official CPV hierarchy gave 37.4 percent on a smaller
+population. Sentence embeddings were worse than word counts on their own and dragged a blend down
+with them, so they were not adopted, which also keeps PyTorch and a nightly encoding step out of the
+pipeline.
+
+**Everything that moved the number changed what is being measured.** Scoring only the tenders
+whose codes carry category information takes the same old labels from 38.5 to 22.8 percent. Merging
+roads, buildings and water into one construction class takes it to 16.6. The last row is the control
+that matters: the old keyword labels, merged and scored on exactly those tenders, do slightly better
+than the CPV labels. The CPV labels agree more often with what buyers declare about their own
+notices, 5.8 against 7.3 percent contradictions, but they do not make the model more confident.
+
+So a published figure in the high teens would be a redefinition, not a better model. There is a
+real case for the redefinition, because the portal's own ground truth does not record roads versus
+buildings versus water for 77 percent of construction tenders, and records no usable category at
+all for about one tagged tender in five. But it has to be published as what it is, beside the
+full-population figure, never in its place.
+
+This also corrects the section above. The label was not what limited the model in the way that
+section claimed: fixing the labeller's substring errors made the labels more truthful without making
+the tenders easier to classify.
+
 ## What an archived detail page is actually worth
 
 The security route is so much better than the history route that the obvious move is to fetch detail

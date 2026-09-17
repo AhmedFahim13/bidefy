@@ -23,10 +23,18 @@ class Checkpoint:
     last_run_pages: int = 0
     last_run_rows: int = 0
     last_run_status: str = ""
+    backfill_completed: bool = False     # set once the archive has been walked end to end
 
     @property
     def backfill_done(self) -> bool:
-        return self.total_pages > 0 and self.next_page > self.total_pages
+        """Whether the whole archive has been crawled at least once.
+
+        This used to be `next_page > total_pages` alone, which holds only until the index grows.
+        New notices lengthen it every day, so a finished crawl looked unfinished again the next
+        morning: the job dropped back into backfill and spent the night re-reading the oldest
+        pages while the new notices on page one went unfetched. The fact is now remembered.
+        """
+        return self.backfill_completed or (self.total_pages > 0 and self.next_page > self.total_pages)
 
     def save(self, path: Path) -> None:
         self.updated_at = _now()
@@ -40,7 +48,8 @@ class Checkpoint:
         if not path.exists():
             return cls(endpoint=endpoint or path.stem)
         data = json.loads(path.read_text(encoding="utf-8"))
-        cp = cls(**data)
+        known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
+        cp = cls(**known)
         if endpoint is not None and cp.endpoint != endpoint:
             raise ValueError(
                 f"checkpoint at {path} is for endpoint {cp.endpoint!r}, not {endpoint!r}"

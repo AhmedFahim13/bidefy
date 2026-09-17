@@ -129,7 +129,8 @@ def _take(plan: Plan, table: str, df: pl.DataFrame, budget: int, part: str | Non
     return take, budget - n * weight
 
 
-def plan_load(root: Path, watermark: Watermark, max_writes: int = DEFAULT_MAX_WRITES, today: str | None = None) -> Plan:
+def plan_load(root: Path, watermark: Watermark, max_writes: int = DEFAULT_MAX_WRITES, today: str | None = None,
+              max_per_run: int | None = None) -> Plan:
     """Spend the day's write budget in the order a visitor would notice the gap.
 
     1. Live tenders fetched since the last load, on their own cursor. A notice crawled tonight must
@@ -144,7 +145,9 @@ def plan_load(root: Path, watermark: Watermark, max_writes: int = DEFAULT_MAX_WR
     window_start = (today_d - timedelta(days=30 * WINDOW_MONTHS)).isoformat()
     used = watermark.writes_today if watermark.day == today_s else 0
     plan = Plan(watermark=replace(watermark, day=today_s, writes_today=used, loaded_rows_today=0))
-    budget = max(0, max_writes - used)
+    # Two runs share the day. Without a per-run share the first one to finish takes the whole
+    # allowance and the second loads nothing at all, which is what was happening.
+    budget = max(0, min(max_writes - used, max_per_run or max_writes))
 
     tenders = _read(root, "tenders")
     backlog = pl.DataFrame()
@@ -302,12 +305,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--data-root", default="data")
     ap.add_argument("--watermark", default="checkpoints/d1_load.json")
     ap.add_argument("--max-writes", type=int, default=DEFAULT_MAX_WRITES, help="per UTC day, counting index entries")
+    ap.add_argument("--max-per-run", type=int, default=None, help="this run's share of the daily cap")
     ap.add_argument("--database", default="bidefy")
     ap.add_argument("--local", action="store_true", help="load the local wrangler D1 instead of remote")
     ap.add_argument("--dry-run", action="store_true", help="write SQL files, do not execute")
     a = ap.parse_args(argv)
     wm = Watermark.load(Path(a.watermark))
-    plan = plan_load(Path(a.data_root), wm, max_writes=a.max_writes)
+    plan = plan_load(Path(a.data_root), wm, max_writes=a.max_writes, max_per_run=a.max_per_run)
     marker = ""
     if plan.statements:
         marker = f"{plan.watermark.day}-{uuid.uuid4().hex[:12]}"

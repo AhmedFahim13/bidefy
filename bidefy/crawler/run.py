@@ -116,6 +116,8 @@ def crawl(
                 flush()
                 buffered_pages = 0
             page += 1
+        if summary.status == "done":
+            cp.backfill_completed = True     # remember it: a longer index must not undo it
         cp.last_run_pages, cp.last_run_rows, cp.last_run_status = summary.pages, summary.rows, summary.status
         flush()
 

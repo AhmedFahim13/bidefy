@@ -234,3 +234,13 @@ def test_execute_reports_which_file_failed(tmp_path: Path):
     except RuntimeError as e:
         assert "b.sql" in str(e)
     assert len(calls) == 1 + d1.RETRIES and "--remote" in calls[0]
+
+
+def test_each_run_gets_a_share_of_the_day(tmp_path: Path):
+    """Without a per-run share the first run of the day took everything and the second loaded nothing."""
+    _clean(tmp_path)
+    first = d1.plan_load(tmp_path, d1.Watermark(), max_writes=10_000, today="2026-09-17", max_per_run=6)
+    assert first.writes == 6 and first.skipped["tenders_live"] == 1
+    second = d1.plan_load(tmp_path, first.watermark, max_writes=10_000, today="2026-09-17", max_per_run=6)
+    assert second.rows > 0                       # the day's budget is not spent, so this run still loads
+    assert second.writes <= 6

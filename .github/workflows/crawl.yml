@@ -57,7 +57,7 @@ jobs:
             exit 1
           fi
           if [ -z "$MODE" ]; then
-            if [ -f "checkpoints/$EP.json" ] && EP="$EP" python3 -c "import json,os,sys;c=json.load(open('checkpoints/'+os.environ['EP']+'.json'));sys.exit(0 if c['total_pages'] and c['next_page']>c['total_pages'] else 1)"; then
+            if [ -f "checkpoints/$EP.json" ] && EP="$EP" python3 -c "import json,os,sys;c=json.load(open('checkpoints/'+os.environ['EP']+'.json'));sys.exit(0 if c.get('backfill_completed') or (c['total_pages'] and c['next_page']>c['total_pages']) else 1)"; then
               MODE=delta
             else
               MODE=backfill
@@ -127,7 +127,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           (cd worker && npm ci --no-audit --no-fund)
-          uv run python -m bidefy.export.d1 --max-writes 40000
+          uv run python -m bidefy.export.d1 --max-writes 80000 --max-per-run 40000
       - name: Commit load watermark
         continue-on-error: true
         run: |

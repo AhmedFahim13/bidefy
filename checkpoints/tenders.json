@@ -7,5 +7,6 @@
   "updated_at": "2026-09-16T22:40:07Z",
   "last_run_pages": 3,
   "last_run_rows": 588,
-  "last_run_status": "done"
+  "last_run_status": "done",
+  "backfill_completed": true
 }

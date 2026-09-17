@@ -203,3 +203,22 @@ def test_backfill_handles_shrinking_page_count(tmp_path):
     assert summary.rows == 3 * 200
     cp = Checkpoint.load(_cp(tmp_path))
     assert cp.total_pages == 3
+
+
+def test_a_finished_backfill_is_remembered_when_the_index_grows(tmp_path):
+    """New notices lengthen the index daily, and that must not send the job back into backfill."""
+    session = FakeSession(total_pages_override=3)
+    run.crawl(session, "tenders", "backfill", tmp_path / "data", _cp(tmp_path), time_budget_s=10_000)
+    cp = Checkpoint.load(_cp(tmp_path))
+    assert cp.backfill_completed and cp.backfill_done
+    cp.total_pages = 6                      # three pages of new notices arrive overnight
+    cp.save(_cp(tmp_path))
+    assert Checkpoint.load(_cp(tmp_path)).backfill_done
+
+
+def test_an_unfinished_backfill_is_not_marked_complete(tmp_path):
+    session = FakeSession(total_pages_override=50)
+    summary = run.crawl(session, "tenders", "backfill", tmp_path / "data", _cp(tmp_path),
+                        time_budget_s=25, now=FakeClock())
+    assert summary.status == "budget"
+    assert not Checkpoint.load(_cp(tmp_path)).backfill_completed

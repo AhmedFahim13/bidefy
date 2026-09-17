@@ -25,6 +25,20 @@ def test_backfill_done():
     assert not Checkpoint(endpoint="t", next_page=1, total_pages=0).backfill_done
 
 
+def test_a_longer_index_does_not_undo_a_finished_backfill():
+    """New notices lengthen the index daily. A finished crawl must not look unfinished again."""
+    grown = Checkpoint(endpoint="t", next_page=3132, total_pages=3134, backfill_completed=True)
+    assert grown.backfill_done
+    assert not Checkpoint(endpoint="t", next_page=3132, total_pages=3134).backfill_done
+
+
+def test_load_ignores_fields_it_does_not_know(tmp_path):
+    path = tmp_path / "tenders.json"
+    path.write_text('{"endpoint": "tenders", "next_page": 5, "something_new": 1}', encoding="utf-8")
+    cp = Checkpoint.load(path, endpoint="tenders")
+    assert cp.next_page == 5 and cp.backfill_completed is False
+
+
 def test_save_leaves_no_tmp_file_behind(tmp_path):
     path = tmp_path / "tenders.json"
     Checkpoint(endpoint="tenders").save(path)

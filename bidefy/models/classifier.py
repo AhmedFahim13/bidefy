@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -31,6 +32,7 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 from collections import defaultdict
 
 from ..crawler import store
+from . import cpv
 from .categories import label_from_tags, label_margin
 
 TARGET_ACCURACY = 0.93     # the bar is set to deliver this, rather than picked by hand
@@ -46,9 +48,24 @@ REPEATS = 3                # the same cross-validation, run this many times and 
                            # it swings 1.7 points of deferral on identical data and an identical
                            # seed, so a single run cannot tell a real change from its own noise.
 ENTITY_PRIOR_WEIGHT = 1.0   # a buyer's own history, combined with the text model as evidence
+LABELLER = "keywords"       # "keywords" (substring rules), "cpv_sector" or "cpv_fine"; see models/cpv.py
+USE_NATURE = False          # add the notice's declared Goods/Works/Services and method to the text
 
 
-def compose(titles, entities=None, ministries=None, briefs=None) -> list[str]:
+def _label(tags: list[str]) -> tuple[str | None, int]:
+    """The training label for a tag list, and how decisively it was chosen."""
+    if LABELLER == "keywords":
+        label = label_from_tags(tags)
+        return label, (label_margin(tags) if label else 0)
+    got = cpv.label(tags)
+    return (got.sector if LABELLER == "cpv_sector" else got.category), got.margin
+
+
+def _slug(value) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value or "").lower()).strip("_") or "none"
+
+
+def compose(titles, entities=None, ministries=None, briefs=None, natures=None, methods=None) -> list[str]:
     """One text per tender: what is being bought, who is buying, and the notice's own description.
 
     The buyer is evidence in itself, since a hospital does not buy bridges. The brief description
@@ -60,8 +77,15 @@ def compose(titles, entities=None, ministries=None, briefs=None) -> list[str]:
     entities = list(entities) if entities is not None else [""] * n
     ministries = list(ministries) if ministries is not None else [""] * n
     briefs = list(briefs) if briefs is not None else [""] * n
-    return [f"{t or ''} || {e or ''} || {m or ''} || {b or ''}"
-            for t, e, m, b in zip(titles, entities, ministries, briefs)]
+    texts = [f"{t or ''} || {e or ''} || {m or ''} || {b or ''}"
+             for t, e, m, b in zip(titles, entities, ministries, briefs)]
+    if natures is None and methods is None:
+        return texts
+    # The buyer declares Goods, Works or Services and a procurement method on every notice. Both
+    # exist for archived tenders too, and they separate construction from supplies cleanly.
+    natures = list(natures) if natures is not None else [""] * n
+    methods = list(methods) if methods is not None else [""] * n
+    return [f"{x} || nature_{_slug(nat)} method_{_slug(meth)}" for x, nat, meth in zip(texts, natures, methods)]
 
 
 def _labelled(data_root: Path) -> pl.DataFrame:
@@ -79,13 +103,13 @@ def _labelled(data_root: Path) -> pl.DataFrame:
             tags = json.loads(raw or "[]")
         except json.JSONDecodeError:
             continue
-        label = label_from_tags(tags)
+        label, margin = _label(tags)
         if label:
             labels[str(tid)] = label
-            margins[str(tid)] = label_margin(tags)
+            margins[str(tid)] = margin
     if not labels:
         return pl.DataFrame()
-    wanted = ["tender_id", "title", "procuring_entity", "ministry"]
+    wanted = ["tender_id", "title", "procuring_entity", "ministry", "nature", "method"]
     frames = []
     for name in ("tenders", "contracts"):
         path = Path(data_root) / "clean" / f"{name}.parquet"
@@ -193,9 +217,11 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
     briefs = df["brief"].fill_null("").to_list() if "brief" in df.columns else [""] * df.height
     # Train on text whose brief is sometimes blanked, so the model tolerates a missing detail page.
     # Score on text with the brief present, because that is how nearly every open tender arrives.
+    natures = df["nature"].fill_null("").to_list() if USE_NATURE and "nature" in df.columns else None
+    methods = df["method"].fill_null("").to_list() if USE_NATURE and "method" in df.columns else None
     X_train = compose(df["title"], df["procuring_entity"], df["ministry"],
-                      ["" if rng.random() < BRIEF_DROPOUT else b for b in briefs])
-    X = compose(df["title"], df["procuring_entity"], df["ministry"], briefs)
+                      ["" if rng.random() < BRIEF_DROPOUT else b for b in briefs], natures, methods)
+    X = compose(df["title"], df["procuring_entity"], df["ministry"], briefs, natures, methods)
     entities = df["procuring_entity"].fill_null("").to_list()
     y = np.array(df["label"].to_list())
     folds = min(FOLDS, int(counts.filter(pl.col("label").is_in(list(keep)))["len"].min()))
@@ -250,6 +276,8 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
         "evaluation": "cross-validated on portal category tags only, entity priors from the training fold",
         "brief_dropout": BRIEF_DROPOUT,
         "min_train_margin": MIN_TRAIN_MARGIN,
+        "labeller": LABELLER,
+        "use_nature": USE_NATURE,
         "repeats": max(REPEATS, 1),
         "deferral_spread": round(max(r[0] for r in per_repeat) - min(r[0] for r in per_repeat), 4),
         "macro_f1_spread": round(max(r[1] for r in per_repeat) - min(r[1] for r in per_repeat), 4),
@@ -263,6 +291,7 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
     models_dir = Path(models_dir)
     models_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump({"model": final, "threshold": threshold, "classes": final_classes, "format": BUNDLE_FORMAT,
+                 "use_nature": USE_NATURE, "labeller": LABELLER,
                  "entity_counts": _entity_counts(entities, y, final_classes, range(len(y))),
                  "entity_prior_weight": ENTITY_PRIOR_WEIGHT},
                 models_dir / "category.joblib", compress=3)

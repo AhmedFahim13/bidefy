@@ -116,7 +116,11 @@ def _categorise(tenders: pl.DataFrame, models_dir: Path, data_root: Path) -> pl.
     entities = tenders["procuring_entity"].fill_null("").to_list() if "procuring_entity" in tenders.columns else None
     ministries = tenders["ministry"].fill_null("").to_list() if "ministry" in tenders.columns else None
     brief_of = _briefs(data_root)
-    texts = classifier.compose(titles, entities, ministries, [brief_of.get(i, "") for i in ids])
+    natures = methods = None
+    if bundle and bundle.get("use_nature"):
+        natures = tenders["nature"].fill_null("").to_list() if "nature" in tenders.columns else None
+        methods = tenders["method"].fill_null("").to_list() if "method" in tenders.columns else None
+    texts = classifier.compose(titles, entities, ministries, [brief_of.get(i, "") for i in ids], natures, methods)
     predicted = classifier.apply(texts, bundle, entities) if bundle else [("", 0.0)] * len(titles)
     categories, confidences, sources = [], [], []
     for tid, (cat, conf) in zip(ids, predicted):

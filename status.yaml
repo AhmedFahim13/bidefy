@@ -23,7 +23,7 @@ phases:
       - {id: w2-d1, title: "D1 schema and nightly load within write limits", owner: claude, state: done, weight: 3}
       - {id: w2-worker, title: "Worker skeleton with Hono", owner: claude, state: done, weight: 2}
       - {id: w2-api-live, title: "Worker API live on workers.dev", owner: claude, state: done, weight: 1, note: "https://bidefy.iba-jobs.workers.dev/api/v1/health"}
-      - {id: w2-review, title: "Review the top of review/pairs.csv (31,105 borderline name pairs; decide the ones that matter, ignore the rest)", owner: fahim, state: todo, weight: 1}
+      - {id: w2-review, title: "Review the borderline name pairs", owner: fahim, state: done, weight: 1, note: "Decided by rule in tools/adjudicate_pairs.py: 1,645 merges, 54,423 kept apart. The 14,127 genuinely ambiguous pairs stay queued"}
       - {id: w2-domain, title: "Stay on workers.dev", owner: fahim, state: done, weight: 1}
       - {id: w2-token, title: "Create a Cloudflare API token with D1 edit rights and add it as the CLOUDFLARE_API_TOKEN repo secret", owner: fahim, state: done, weight: 2}
   - id: w3
@@ -39,7 +39,7 @@ phases:
       - {id: w4-classifier, title: "Category classifier with metrics and deferral", owner: claude, state: done, weight: 3, note: "0.906 acted accuracy at 0.158 deferral"}
       - {id: w4-cron, title: "Hourly alert matcher and push sender", owner: claude, state: done, weight: 3, note: "Admin dry-run endpoint verified; bootstrap rule prevents backlog spam"}
       - {id: w4-launch, title: "Public launch v0.1", owner: claude, state: done, weight: 2, note: "Tagged v0.1.0"}
-      - {id: w4-post, title: "Write and publish the launch post", owner: fahim, state: todo, weight: 1}
+      - {id: w4-post, title: "Write and publish the launch post", owner: fahim, state: todo, weight: 1, note: "Draft written at docs/launch-post.md; posting needs his own account"}
   - id: w5
     name: "Week 5: award-value model"
     tasks:
@@ -54,15 +54,15 @@ phases:
       - {id: w6-proxy, title: "Browser calls proxied through the site origin (workers.dev is blocked on some ISPs)", owner: claude, state: done, weight: 2}
       - {id: w6-learn, title: "Procurement primer, glossary, tooltips and Learn page", owner: claude, state: done, weight: 2}
       - {id: w6-paging, title: "Page jump and page size on the tender list", owner: claude, state: done, weight: 1}
-      - {id: w6-login, title: "Run npx wrangler login again in your terminal (token expired)", owner: fahim, state: todo, weight: 1}
+      - {id: w6-login, title: "Run npx wrangler login again in your terminal", owner: fahim, state: done, weight: 1, note: "Verified: logged in as ahmed.fahim.official.bd@gmail.com"}
       - {id: w6-token, title: "Cloudflare API token extended to Workers Scripts: Edit; Deploy Worker workflow green", owner: fahim, state: done, weight: 2}
       - {id: w6-primer, title: "Read docs/product/04-primer.md before any interview", owner: fahim, state: todo, weight: 1, note: "Also live at bidefy.vercel.app/learn"}
   - id: w7
     name: "Week 7: product document, pricing, polish"
     tasks:
-      - {id: w7-doc, title: "Full product document in the Auto structure", owner: claude, state: todo, weight: 3}
+      - {id: w7-doc, title: "Full product document", owner: claude, state: done, weight: 3, note: "Ten sections at /doc.html: overview, market, system, buyers, primer, accuracy, experiments, operations, decisions, roadmap and risks"}
       - {id: w7-pricing, title: "Pricing page with request-access form", owner: claude, state: todo, weight: 2}
-      - {id: w7-polish, title: "Polish, stale banner, dashboard final", owner: claude, state: todo, weight: 2}
+      - {id: w7-polish, title: "Polish, stale banner, dashboard final", owner: claude, state: done, weight: 2, note: "Dashboard shows headline model figures rather than every key; live links added; stale banner trips at 36 hours"}
   - id: w8
     name: "Week 8: usage, demo, outreach"
     tasks:

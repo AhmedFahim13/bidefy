@@ -76,18 +76,60 @@ def _task_li(t: dict) -> str:
     return f"<li>{html.escape(t['title'])}{tag}{note}</li>"
 
 
+def _pct(v) -> str:
+    return "n/a" if v is None else f"{v * 100:.1f}%"
+
+
+def _x(v) -> str:
+    return "n/a" if v is None else f"{v:.2f}x"
+
+
+# The headline figures, in the order a reader should meet them. Everything else stays in
+# models/metrics.json and on the accuracy page: a dashboard that prints every key prints none.
+HEADLINE = (
+    ("award_value_model", "Award, from the tender security", (
+        ("security_mape", "median error", _pct),
+        ("security_coverage_80", "inside the band", _pct),
+        ("security_band_width_median", "typical band", _x),
+        ("security_n", "awards scored", lambda v: f"{v:,}" if v is not None else "n/a"))),
+    ("award_value_model", "Award, from entity history", (
+        ("history_mape", "median error", _pct),
+        ("history_coverage_80", "inside the band", _pct),
+        ("history_band_width_median", "typical band", _x),
+        ("deferral_rate", "declined overall", _pct))),
+    ("category_classifier", "Category", (
+        ("accuracy_acted", "accuracy on what it answers", _pct),
+        ("deferral_rate", "declined", _pct),
+        ("macro_f1", "macro F1", lambda v: "n/a" if v is None else f"{v:.3f}"),
+        ("n_labels", "labels", lambda v: f"{v:,}" if v is not None else "n/a"),
+        ("truth_coverage", "tenders with codes that identify a sector", _pct))),
+)
+
+
+def _metrics_table(metrics: dict | None) -> str:
+    if not metrics:
+        return "<p style='color:var(--ink3)'>No models trained yet.</p>"
+    blocks = []
+    for model, title, fields in HEADLINE:
+        data = metrics.get(model) or {}
+        if not data:
+            continue
+        rows = "".join(
+            f"<tr><td>{html.escape(label)}</td><td>{html.escape(fmt(data.get(key)))}</td></tr>"
+            for key, label, fmt in fields)
+        trained = data.get("trained_at", "")
+        blocks.append(f"<h3>{html.escape(title)}</h3><table>{rows}</table>"
+                      f"<div class='muted' style='margin-top:6px'>trained {html.escape(str(trained))}</div>")
+    return "<div class='grid'>" + "".join(f"<div class='card'>{b}</div>" for b in blocks) + "</div>"
+
+
 def render_dashboard(status: dict, p: dict, crawl: dict, metrics: dict | None) -> str:
     crawl_rows = "".join(
         f"<tr><td>{html.escape(ep)}</td><td>{c.get('next_page', 1) - 1:,} / {c.get('total_pages', 0):,}</td>"
         f"<td>{html.escape(c.get('last_run_status', ''))}</td><td>{html.escape(c.get('updated_at', ''))}</td></tr>"
         for ep, c in crawl.items()
     ) or "<tr><td colspan=4>No crawl yet</td></tr>"
-    metrics_html = (
-        "<table><tr><th>Model</th><th>Metric</th><th>Value</th></tr>"
-        + "".join(f"<tr><td>{html.escape(m)}</td><td>{html.escape(k)}</td><td>{html.escape(str(v))}</td></tr>" for m, d in metrics.items() for k, v in d.items())
-        + "</table>"
-        if metrics else "<p style='color:var(--ink3)'>No models trained yet. First model lands in week 4.</p>"
-    )
+    metrics_html = _metrics_table(metrics)
     phases_html = "".join(
         f"<div class='card'><h3>{html.escape(ph['name'])}</h3><div class='bar'><i style='width:{ph['percent']}%'></i></div>"
         f"<div class='muted'>{ph['percent']}%</div><ul>{''.join(_task_li(t) for t in ph['tasks'])}</ul></div>"
@@ -99,9 +141,14 @@ def render_dashboard(status: dict, p: dict, crawl: dict, metrics: dict | None) -
     <div class="bar"><i style="width:{p['percent']}%"></i></div><div class="muted">{p['done_count']} of {p['total_count']} tasks done. Launch target {html.escape(str(status.get('launch_target', '')))}</div></div>
   <div class="card"><div class="muted">Next three steps</div><ul>{''.join(_task_li(t) for t in p['next_steps'])}</ul></div>
   <div class="card"><div class="muted">Tasks only Fahim can do</div><ul>{''.join(_task_li(t) for t in p['fahim_tasks']) or '<li>None open</li>'}</ul></div>
+  <div class="card"><div class="muted">Live</div><ul>
+    <li><a href="https://bidefy.vercel.app">The site</a></li>
+    <li><a href="https://bidefy.iba-jobs.workers.dev/api/v1/health">API health</a></li>
+    <li><a href="doc.html">Product document, including what it gets right</a></li>
+    <li><a href="https://github.com/AhmedFahim13/bidefy/actions">Nightly runs</a></li></ul></div>
 </div>
 <h2>Crawl</h2><div class="card"><table><tr><th>Endpoint</th><th>Pages</th><th>Last run</th><th>Updated</th></tr>{crawl_rows}</table></div>
-<h2>Models</h2><div class="card">{metrics_html}</div>
+<h2>Models</h2>{metrics_html}
 <h2>Done</h2><div class="card"><ul>{''.join(_task_li(t) for t in p['done']) or '<li>Nothing yet</li>'}</ul></div>
 <h2>Phases</h2><div class="grid">{phases_html}</div>"""
     return _page(f"{status['project']} command centre", body, "dash")

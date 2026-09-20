@@ -91,6 +91,25 @@ def main() -> None:
             "published a security, that is every one the route could be scored on without fitting "
             "and testing on the same rows.")
         add("")
+        decay = aw.get("security_coverage_by_band_age") or {}
+        if decay:
+            add("### A band ages")
+            add("")
+            add("The share buyers ask for drifts upward, and the spread of awards around it has widened "
+                "month by month. So a band set in June covers June better than it covers September. "
+                "The model retrains every night, which means the band a live tender meets is a day or "
+                "two old, never months. Coverage is therefore reported against how stale the band was "
+                "when the award landed.")
+            add("")
+            add("| Band was this old | Awards | Inside the band |")
+            add("|---|---|---|")
+            for label, row in decay.items():
+                add(f"| {label} | {row.get('awards', 0):,} | {pct(row.get('coverage_80'))} |")
+            add("")
+            add(f"The first row is the one the product runs at. The last is what the same band is worth "
+                f"months after it was set, and it is the figure in the table above, because measuring "
+                f"against the whole window is the conservative choice.")
+            add("")
         share = aw.get("live_security_share")
         if share is not None and aw.get("security_mape") is not None:
             add("### What a bidder actually meets")

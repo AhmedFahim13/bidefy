@@ -60,6 +60,53 @@ Every figure moves the right way at once, which is what separates a real effect 
 coincidence moves some up and some down. It answers more tenders, with narrower bands, at the same
 coverage. The drop in declines is about three times its own sampling error. Kept.
 
+### How narrow can the security band get?
+
+The band was 1.42 times wide, which on a one crore tender is a forty lakh spread, so it was worth
+asking what sets it. The award is between 30 and 43 times the security at the tenth and ninetieth
+percentiles, and that spread is the band.
+
+| Change | Error of the middle estimate | Width needed to cover 80 percent |
+|---|---|---|
+| One multiple per procurement method | 8.25 percent | 1.432x |
+| A multiple per buyer, pulled toward its method | 7.69 percent | 1.409x |
+| A model of the multiple on buyer, method, category, size and date | 8.14 percent | 1.433x |
+
+**The buyer's own habit helps; a model of it does not.** Buyers set the security as a share of
+their own estimate and keep to their own share, so their past awards say more than their
+procurement method does. A gradient boosted model given the same information plus size and date
+did no better than the method median, and an earlier in-sample figure suggesting per-buyer medians
+could reach 1.25x was overfitting: each buyer's median was measured on the very rows it was scored
+against.
+
+**The width is close to a floor, and the reason is structural.** The security pins the buyer's
+estimate. What remains is the gap between that estimate and the winning bid, which competition
+sets. The portal publishes neither the losing bids nor how many bidders turned up, so that
+variation cannot be modelled from public data. It is not a modelling failure, it is missing data.
+Splitting by tender size does not help either: every quarter of tenders, from four lakh to nearly
+three crore, needs between 1.38 and 1.42 times.
+
+**A calibration bug surfaced on the way.** The band's edges were measured on the same rows the
+multiplier was fitted on. With one median per method that barely mattered. With a median per buyer
+it flattered badly: the band looked like 1.32x while covering 75.5 percent of later awards and
+promising 80. The edges are now measured on securities the multiplier never saw.
+
+**Bands age, so coverage is now reported against how stale the band is.** The share buyers ask for
+drifts upward and the spread has widened month by month, from 1.29x in January to 1.43x in
+September. A band set in June covers June far better than September.
+
+| Band was this old when the award landed | Awards | Inside the band |
+|---|---|---|
+| Within a week | 472 | 81.8 percent |
+| One to three weeks | 655 | 75.7 percent |
+| Three to six weeks | 845 | 77.3 percent |
+| Over six weeks | 1,458 | 75.7 percent |
+
+The model retrains every night, so a live tender meets a band that is a day or two old, which is
+the first row. The accuracy page publishes the whole table and keeps the conservative
+whole-window figure in its headline table, because a number that only holds at the best horizon
+should never be quoted alone.
+
 ### The tender document price is not a second security
 
 A notice publishes two prices the buyer chose: the refundable security, and the fee to download the

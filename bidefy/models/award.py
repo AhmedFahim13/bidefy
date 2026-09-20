@@ -2,8 +2,11 @@
 
 Route 1, the security route. A tender notice publishes a refundable tender security, which each
 procuring entity sets as a fixed share of its own (unpublished) cost estimate. Awards land close
-to that estimate, so the award value is close to a constant multiple of the security. Where the
-notice publishes one, that multiple gives a band a few tens of percent wide.
+to that estimate, so the award value is close to a multiple of the security, and each buyer tends
+to keep to its own multiple, so the multiplier is learned per buyer and pulled back toward the
+buyer's procurement method where a buyer has little history. What is left over is the gap between
+the buyer's estimate and the winning bid, which competition sets and the portal never publishes,
+so it is the floor on how narrow this band can be.
 
 Route 2, the history route, for tenders with no published security. A LightGBM model on the
 entity, ministry, method, district, category and the title (both as quantity signals and as a
@@ -169,22 +172,67 @@ def _fit_text(fit: pd.DataFrame, others: list[pd.DataFrame], seed: int, folds: i
 
 # --------------------------------------------------------------------------- the security route
 
+ENTITY_SHRINK = 10.0       # a buyer needs this many past securities to be trusted over its method
+
+
 def _fit_security(df: pd.DataFrame) -> dict | None:
-    """Multiples of the published security, per method where there is enough history."""
+    """Multiples of the published security: per method, and per buyer where a buyer has a habit.
+
+    Buyers set the security as a share of their own cost estimate, and each one tends to pick the
+    same share every time, so its past awards say more than its procurement method does. A buyer
+    with few securities on record is pulled back toward its method, which is what ENTITY_SHRINK
+    does: it is the number of past securities at which a buyer's own habit outweighs its method.
+    """
     rows = df[_has_security(df)]
     if len(rows) < MIN_SECURITY_ROWS:
         return None
     sec_lakh = pd.to_numeric(rows["security_bdt"], errors="coerce").astype(float) / TAKA_PER_LAKH
     log_ratio = np.log(rows["lakh"].to_numpy() / sec_lakh.to_numpy())
-    model = {"global": float(np.median(log_ratio)), "by_method": {}, "n": int(len(rows))}
+    model = {"global": float(np.median(log_ratio)), "by_method": {}, "by_entity": {}, "n": int(len(rows))}
     for method, idx in rows.groupby("method").groups.items():
         if method and len(idx) >= MIN_GROUP_ROWS:
             model["by_method"][str(method)] = float(np.median(log_ratio[rows.index.get_indexer(idx)]))
+    methods = rows["method"].to_numpy()
+    for entity, idx in rows.groupby("pe_id").groups.items():
+        if not entity:
+            continue
+        pos = rows.index.get_indexer(idx)
+        own = float(np.median(log_ratio[pos]))
+        fallback = model["by_method"].get(str(methods[pos[0]]), model["global"])
+        model["by_entity"][str(entity)] = (own * len(pos) + fallback * ENTITY_SHRINK) / (len(pos) + ENTITY_SHRINK)
     return model
 
 
-def _security_log_multiple(model: dict, methods: np.ndarray) -> np.ndarray:
-    return np.array([model["by_method"].get(str(m), model["global"]) for m in methods])
+def _security_residuals(model: dict, rows: pd.DataFrame) -> np.ndarray:
+    """How far each award sat from the multiple its security implied."""
+    return (np.log(rows["lakh"].to_numpy() * TAKA_PER_LAKH / pd.to_numeric(rows["security_bdt"]).to_numpy())
+            - _security_log_multiple(model, rows["method"].to_numpy(), rows["pe_id"].to_numpy()))
+
+
+def _security_band(model: dict, rows: pd.DataFrame) -> tuple[float, float]:
+    """The band's edges, measured on securities the multiplier was never fitted on.
+
+    Measuring them on the fitting rows makes the band look tighter than it is, and the tighter the
+    multiplier the worse the flattery: once each buyer got its own multiple, an in-sample band
+    covered 75.5 percent of later awards while promising 80.
+    """
+    if rows.empty:
+        return 0.0, 0.0
+    ratio = _security_residuals(model, rows)
+    n = len(ratio)
+    return (float(np.quantile(ratio, max(0.0, LO_Q * (n + 1) / n))),
+            float(np.quantile(ratio, min(1.0, HI_Q * (n + 1) / n))))
+
+
+def _security_log_multiple(model: dict, methods: np.ndarray, entities: np.ndarray | None = None) -> np.ndarray:
+    """The buyer's own habit where it has one, otherwise its method, otherwise the overall median."""
+    by_method = model.get("by_method", {})
+    by_entity = model.get("by_entity", {})
+    if entities is None:
+        entities = np.array([""] * len(methods))
+    return np.array([by_entity.get(str(e)) if by_entity.get(str(e)) is not None
+                     else by_method.get(str(m), model["global"])
+                     for m, e in zip(methods, entities)])
 
 
 def _group_keys(df: pd.DataFrame, predicted: np.ndarray | None = None,
@@ -391,16 +439,18 @@ def _evaluate_security_route(pdf: pd.DataFrame) -> dict:
     out = {"security_route_n_total": int(len(rows))}
     if len(rows) < 2 * MIN_SECURITY_ROWS:
         return out
+    signed = rows["signed_on"].astype(str)
+    fit_cut = str(rows["signed_on"].iloc[int(len(rows) * 0.60)])
     cut = str(rows["signed_on"].iloc[int(len(rows) * 0.80)])
-    earlier, later = rows[rows["signed_on"].astype(str) < cut], rows[rows["signed_on"].astype(str) >= cut]
+    earlier = rows[signed < fit_cut]
+    calib = rows[(signed >= fit_cut) & (signed < cut)]
+    later = rows[signed >= cut]
     model = _fit_security(earlier)
-    if model is None or len(later) < 30:
+    if model is None or len(later) < 30 or len(calib) < 30:
         return out
-    ratio = (np.log(earlier["lakh"].to_numpy() * TAKA_PER_LAKH / pd.to_numeric(earlier["security_bdt"]).to_numpy())
-             - _security_log_multiple(model, earlier["method"].to_numpy()))
-    lo, hi = float(np.quantile(ratio, LO_Q)), float(np.quantile(ratio, HI_Q))
+    lo, hi = _security_band(model, calib)
     sec_lakh = pd.to_numeric(later["security_bdt"], errors="coerce").to_numpy() / TAKA_PER_LAKH
-    centre = np.log(sec_lakh) + _security_log_multiple(model, later["method"].to_numpy())
+    centre = np.log(sec_lakh) + _security_log_multiple(model, later["method"].to_numpy(), later["pe_id"].to_numpy())
     q50, q10, q90 = np.exp(centre), np.exp(centre + lo), np.exp(centre + hi)
     actual = later["lakh"].to_numpy()
     ok = np.isfinite(q50) & (actual > 0)
@@ -408,11 +458,31 @@ def _evaluate_security_route(pdf: pd.DataFrame) -> dict:
     out.update({
         "security_n": int(ok.sum()),
         "security_fitted_on": int(len(earlier)),
+        "security_calibrated_on": int(len(calib)),
         "security_test_from": cut,
         "security_mape": round(float(np.median(np.abs(q50[ok] - actual[ok]) / actual[ok])), 4),
         "security_coverage_80": round(float(inside[ok].mean()), 4),
         "security_band_width_median": round(float(np.median(q90[ok] / np.maximum(q10[ok], 1e-9))), 2),
     })
+    # A band ages. The share buyers ask for drifts, and the spread of awards around it has widened
+    # month by month, so a band set in June covers June better than September. The model retrains
+    # every night, so the band a live tender meets is at most a day or two old. Coverage is
+    # therefore reported against how stale the band was, and the freshest bucket is the one the
+    # product actually runs at. The whole-window figure above is the stale end of the same table.
+    age = (pd.to_datetime(later["signed_on"], errors="coerce")
+           - pd.to_datetime(calib["signed_on"], errors="coerce").max()).dt.days.to_numpy()
+    decay = {}
+    for lo_d, hi_d, label in ((0, 7, "within a week"), (7, 21, "one to three weeks"),
+                              (21, 45, "three to six weeks"), (45, 10_000, "over six weeks")):
+        m = ok & (age >= lo_d) & (age < hi_d)
+        if m.sum() >= 50:
+            decay[label] = {"awards": int(m.sum()), "coverage_80": round(float(inside[m].mean()), 4)}
+    if decay:
+        out["security_coverage_by_band_age"] = decay
+        fresh = decay.get("within a week")
+        if fresh:
+            out["security_coverage_fresh_band"] = fresh["coverage_80"]
+            out["security_n_fresh_band"] = fresh["awards"]
     return out
 
 
@@ -521,14 +591,22 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     # For serving, the multiplier learns from every security in the archive, which is what the
     # nightly retrain would do. The figures published for this route come from the separate,
     # earlier-only fit in _evaluate_security_route, never from this one.
-    sec_model = _fit_security(past) or _fit_security(pdf)
+    with_sec = (past if _has_security(past).sum() >= MIN_SECURITY_ROWS else pdf)
+    with_sec = with_sec[_has_security(with_sec)].sort_values("signed_on")
+    sec_model = _fit_security(with_sec)
     sec_lo = sec_hi = 0.0
-    if sec_model:
-        with_sec = (past if _has_security(past).sum() >= MIN_SECURITY_ROWS else pdf)
-        with_sec = with_sec[_has_security(with_sec)]
-        ratio = (np.log(with_sec["lakh"].to_numpy() * TAKA_PER_LAKH / pd.to_numeric(with_sec["security_bdt"]).to_numpy())
-                 - _security_log_multiple(sec_model, with_sec["method"].to_numpy()))
-        sec_lo, sec_hi = float(np.quantile(ratio, LO_Q)), float(np.quantile(ratio, HI_Q))
+    if sec_model and len(with_sec) >= 2 * MIN_SECURITY_ROWS:
+        signed = with_sec["signed_on"].astype(str)
+        fit_cut = str(with_sec["signed_on"].iloc[int(len(with_sec) * 0.80)])
+        weaker = _fit_security(with_sec[signed < fit_cut])
+        if weaker:
+            # The band is measured against a multiplier that saw only the earlier securities, then
+            # served with one that saw them all. The served model is the better of the two, so the
+            # band errs wide rather than narrow. It is calibrated on the most recent securities
+            # because the spread widens over time and tonight's tenders resemble them most.
+            sec_lo, sec_hi = _security_band(weaker, with_sec[signed >= fit_cut])
+    elif sec_model:
+        sec_lo, sec_hi = _security_band(sec_model, with_sec)     # too few to hold any back
 
     bundle = {
         "model": model, "difficulty": difficulty, "levels": levels, "vectorizer": vec, "ridge": ridge,
@@ -718,7 +796,7 @@ def predict(rows, bundle: dict, date_col: str = "published_at", already_prepared
         has = _has_security(df)
         if has.any():
             sec_lakh = pd.to_numeric(df.loc[has, "security_bdt"], errors="coerce").to_numpy() / TAKA_PER_LAKH
-            centre = np.log(sec_lakh) + _security_log_multiple(sec_model, df.loc[has, "method"].to_numpy())
+            centre = np.log(sec_lakh) + _security_log_multiple(sec_model, df.loc[has, "method"].to_numpy(), df.loc[has, "pe_id"].to_numpy())
             q10[has] = np.exp(centre + bundle["security_lo"])
             q50[has] = np.exp(centre)
             q90[has] = np.exp(centre + bundle["security_hi"])

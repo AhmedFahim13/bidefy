@@ -16,7 +16,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   const requested = Number.parseInt(one(sp.size) || "25", 10);
   const size = PAGE_SIZES.includes(requested) ? requested : 25;
   const qs = buildQuery({ ...state, page, size: size === 25 ? "" : size });
-  const [stats, options, list] = await Promise.all([api.stats(), api.filters(), api.tenders(qs)]);
+  const [stats, options, list] = await Promise.all([api.stats(), api.filters(buildQuery(state)), api.tenders(qs)]);
   const items = list?.items ?? [];
 
   return (

@@ -68,7 +68,8 @@ async function get<T>(path: string, revalidate = 300): Promise<T | null> {
 
 export const api = {
   stats: () => get<Stats>("/api/v1/stats", 120),
-  filters: () => get<Filters>("/api/v1/filters", 3600),
+  // Counts follow the filters already chosen, so the dropdowns describe what is on screen.
+  filters: (qs = "") => get<Filters>(`/api/v1/filters${qs ? "?" + qs : ""}`, 300),
   tenders: (qs: string) => get<{ page: number; size: number; items: Tender[] }>(`/api/v1/tenders${qs ? "?" + qs : ""}`, 120),
   tender: (id: string) => get<{ tender: Tender; similar_awards: Award[]; prediction: Prediction | null }>(`/api/v1/tenders/${encodeURIComponent(id)}`),
   bidder: (id: string) => get<{ bidder: Bidder; awards: Award[]; flags?: Record<string, unknown> }>(`/api/v1/bidders/${encodeURIComponent(id)}`),

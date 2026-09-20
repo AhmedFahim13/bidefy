@@ -47,6 +47,37 @@ export function tenderListQuery(f: TenderFilters): Query {
   return { sql, params };
 }
 
+export type Facet = "ministry" | "category" | "status";
+
+/** Counts for one dropdown, with every other filter applied.
+ *
+ * A facet never constrains itself. Picking a ministry must narrow the category counts to that
+ * ministry, while the ministry list keeps every ministry so the choice can be changed. Categories
+ * a ministry never buys simply do not come back, which is what makes the dropdown useful.
+ */
+export function facetQuery(f: TenderFilters, facet: Facet, limit = 200): Query {
+  const where: string[] = [`${facet} IS NOT NULL`, `${facet} != ''`];
+  const params: (string | number)[] = [];
+  if (facet !== "status" && f.status !== "all") { where.push("status = ?"); params.push(f.status); }
+  if (f.q) { where.push("title LIKE ?"); params.push(`%${f.q}%`); }
+  if (facet !== "ministry" && f.ministry) { where.push("ministry = ?"); params.push(f.ministry); }
+  if (facet !== "category" && f.category) {
+    if (f.category === "construction") {
+      where.push(`category IN (${CONSTRUCTION_TYPES.map(() => "?").join(", ")})`);
+      params.push(...CONSTRUCTION_TYPES);
+    } else {
+      where.push("category = ?");
+      params.push(f.category);
+    }
+  }
+  params.push(limit);
+  return {
+    sql: `SELECT ${facet} AS v, COUNT(*) AS n FROM tenders WHERE ${where.join(" AND ")} ` +
+         `GROUP BY ${facet} ORDER BY n DESC LIMIT ?`,
+    params,
+  };
+}
+
 export function tenderByIdQuery(id: string): Query {
   return {
     sql:

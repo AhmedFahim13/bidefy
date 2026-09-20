@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { bidderQuery, parseJsonList, parseJsonObject, parseTenderFilters, peQuery, predictionQuery, tenderByIdQuery, tenderListQuery } from "./query";
+import { bidderQuery, facetQuery, parseJsonList, parseJsonObject, parseTenderFilters, peQuery, predictionQuery, tenderByIdQuery, tenderListQuery } from "./query";
 import { newSubscriptionId, validateSubscription } from "./subscriptions";
 import { runAlerts } from "./alerts";
 import { hashIp, validateAccessRequest } from "./access";
@@ -77,11 +77,17 @@ app.get("/api/v1/pe/:id", async (c) => {
 });
 
 app.get("/api/v1/filters", async (c) => {
+  // Counts follow whatever is already chosen, so the dropdowns describe the tenders in front of
+  // the reader rather than the whole archive.
+  const f = parseTenderFilters(new URL(c.req.url).searchParams);
+  const ministryQ = facetQuery(f, "ministry", 60);
+  const statusQ = facetQuery(f, "status");
+  const categoryQ = facetQuery(f, "category");
   const [ministries, districts, statuses, categories] = await c.env.DB.batch([
-    c.env.DB.prepare("SELECT ministry AS v, COUNT(*) AS n FROM tenders WHERE ministry != '' GROUP BY ministry ORDER BY n DESC LIMIT 60"),
+    c.env.DB.prepare(ministryQ.sql).bind(...ministryQ.params),
     c.env.DB.prepare("SELECT district AS v, COUNT(*) AS n FROM contracts WHERE district != '' GROUP BY district ORDER BY n DESC LIMIT 70"),
-    c.env.DB.prepare("SELECT status AS v, COUNT(*) AS n FROM tenders WHERE status != '' GROUP BY status ORDER BY n DESC"),
-    c.env.DB.prepare("SELECT category AS v, COUNT(*) AS n FROM tenders WHERE category IS NOT NULL AND category != '' GROUP BY category ORDER BY n DESC"),
+    c.env.DB.prepare(statusQ.sql).bind(...statusQ.params),
+    c.env.DB.prepare(categoryQ.sql).bind(...categoryQ.params),
   ]);
   return c.json({
     ministries: ministries.results ?? [],

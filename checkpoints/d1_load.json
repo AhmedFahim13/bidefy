@@ -1,10 +1,10 @@
 {
-  "tenders": "20260914T123615604281Z",
+  "tenders": "20260914T123808220772Z",
   "contracts": "",
-  "bidders": "2026-09-20",
-  "loaded_rows_today": 20301,
-  "writes_today": 79996,
-  "day": "2026-09-20",
+  "bidders": "2026-09-21",
+  "loaded_rows_today": 20442,
+  "writes_today": 39999,
+  "day": "2026-09-21",
   "live": "20260920T221226444456Z",
   "bidders_after": ""
 }

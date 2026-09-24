@@ -90,3 +90,72 @@ def test_security_route_gives_a_far_narrower_band(tmp_path: Path):
 
 def test_train_without_data_returns_none(tmp_path: Path):
     assert award.train(tmp_path, tmp_path / "models") is None
+
+
+def test_a_mispunctuated_security_never_reaches_the_screen(tmp_path: Path):
+    """One notice lists a 66 lakh award with an 804 crore security. That is a typo, not a habit.
+
+    Serving it would put a figure in the lakhs of crores on a tender page, which costs more trust
+    than a wide band does, so the row falls back to history instead.
+    """
+    _synthetic(tmp_path, with_security=True)
+    award.train(tmp_path, tmp_path / "models", seed=0)
+    bundle = award.load(tmp_path / "models")
+    base = {"title": "Supply of medical items", "pe_id": "pe1", "ministry": "M1", "method": "OTM",
+            "district": "D1", "category": "medical", "published_at": "2026-09-01T10:00"}
+    rows = pl.DataFrame([{**base, "tender_id": "SANE", "security_bdt": 50_000.0},
+                         {**base, "tender_id": "TYPO", "security_bdt": 8_047_800_000.0}])
+    out = award.predict(rows, bundle)
+    by_id = {r["tender_id"]: r for r in out.iter_rows(named=True)}
+    assert by_id["SANE"]["basis"] == "security"
+    assert by_id["TYPO"]["basis"] == "history"          # the security was ignored, not believed
+    assert by_id["TYPO"]["q50_lakh"] < 100 * by_id["SANE"]["q50_lakh"]
+
+
+def test_implausible_securities_are_dropped_before_the_band_is_measured(tmp_path: Path):
+    """A single typo in the calibration slice would stretch the band on the strength of nothing."""
+    _synthetic(tmp_path, with_security=True)
+    path = tmp_path / "clean" / "contracts.parquet"
+    good = pl.read_parquet(path)
+    clean = award.train(tmp_path, tmp_path / "models", seed=0)
+    bad = good.filter(pl.col("security_bdt").is_not_null()).head(6).with_columns(
+        pl.col("tender_id").add("_typo"),
+        (pl.col("security_bdt") * 10_000).alias("security_bdt"))   # decimal point in the wrong place
+    pl.concat([good, bad]).write_parquet(path)
+    dirty = award.train(tmp_path, tmp_path / "models", seed=0)
+    assert dirty["security_rows_implausible"] >= 6
+    assert dirty["security_band_width_median"] < clean["security_band_width_median"] * 1.5
+
+
+def test_coverage_is_reported_per_taka_as_well_as_per_tender(tmp_path: Path):
+    _synthetic(tmp_path, with_security=True)
+    m = award.train(tmp_path, tmp_path / "models", seed=0)
+    for route in ("security", "history"):
+        v = m[f"{route}_by_value"]
+        assert set(v) >= {"coverage_per_tender", "coverage_per_taka_estimated",
+                          "coverage_per_taka_awarded", "mean_error"}
+        for key in ("coverage_per_tender", "coverage_per_taka_estimated", "coverage_per_taka_awarded"):
+            assert 0.0 <= v[key] <= 1.0
+
+
+def test_value_bands_are_cut_on_the_estimate_not_on_the_award():
+    """Cutting on the award that landed would select the rows the model guessed low on.
+
+    That cut makes any honest model look as though it fails on large tenders, because the largest
+    actual awards are the ones a central estimate sat below by definition. The published bands are
+    therefore cut on the estimate, which is also all a reader has before the award.
+    """
+    import numpy as np
+    n = 500
+    rng = np.random.default_rng(0)
+    q50 = np.linspace(10, 1000, n)
+    actual = q50 * np.exp(rng.normal(0, 0.4, n))
+    q10, q90 = q50 / 2, q50 * 2
+    out = award._by_value(actual, q50, q10, q90)
+    edges = [(s["estimate_from_lakh"], s["estimate_to_lakh"]) for s in out["strata"]]
+    assert edges[0][0] == round(float(q50.min()), 2)
+    assert edges[-1][1] == round(float(q50.max()), 2)
+    # Bands cut on the estimate leave the miss rate roughly level across sizes; the noise here is
+    # multiplicative and size-independent, so a band that tracked the award would not.
+    covs = [s["coverage_80"] for s in out["strata"]]
+    assert max(covs) - min(covs) < 0.15

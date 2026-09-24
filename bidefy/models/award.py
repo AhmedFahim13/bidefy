@@ -51,6 +51,11 @@ MIN_SECURITY_ROWS = 60
 MIN_GROUP_ROWS = 40
 DEFER_RATIO = 12.0         # wider than this and the band rules out too little to be worth showing
 MIN_ENTITY_HISTORY = 3
+SECURITY_RATIO_BOUNDS = (5.0, 300.0)    # plausible award-over-security multiples. Outside this is a
+                                        # mis-punctuated figure, not a buyer with an unusual habit.
+SECURITY_IMPLIED_CEILING = 5.0          # an implied award this many times the largest ever awarded
+                                        # is a parse error too, and must not reach the screen
+VALUE_STRATA = 5                        # size bands in the published by-value table
 MIN_METHOD_ROWS = 300      # below this a group borrows the shared quantiles
 CONFORMAL_GROUPS = ("method",)   # what the band is calibrated separately for
 COVERAGE = 0.80
@@ -175,6 +180,24 @@ def _fit_text(fit: pd.DataFrame, others: list[pd.DataFrame], seed: int, folds: i
 ENTITY_SHRINK = 10.0       # a buyer needs this many past securities to be trusted over its method
 
 
+def _plausible_security(rows: pd.DataFrame) -> np.ndarray:
+    """Rows whose published security and award stand in a believable relation to each other.
+
+    A security is a small share of the buyer's own estimate, so the award lands tens of times
+    larger; the median multiple is about thirty-five and the first and ninety-ninth percentiles are
+    twenty and sixty-three. A handful of notices carry a mis-punctuated figure -- one 66 lakh award
+    lists a security of 804 crore -- and those are parse errors, not buyers with unusual habits.
+    They have to be dropped from fitting, from calibration and from scoring alike: one of them left
+    in the calibration slice would stretch the band on the strength of a typo.
+    """
+    sec = pd.to_numeric(rows["security_bdt"], errors="coerce").to_numpy(dtype=float) / TAKA_PER_LAKH
+    lakh = pd.to_numeric(rows["lakh"], errors="coerce").to_numpy(dtype=float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio = lakh / sec
+    lo, hi = SECURITY_RATIO_BOUNDS
+    return np.isfinite(ratio) & (ratio >= lo) & (ratio <= hi)
+
+
 def _fit_security(df: pd.DataFrame) -> dict | None:
     """Multiples of the published security: per method, and per buyer where a buyer has a habit.
 
@@ -186,9 +209,16 @@ def _fit_security(df: pd.DataFrame) -> dict | None:
     rows = df[_has_security(df)]
     if len(rows) < MIN_SECURITY_ROWS:
         return None
+    ok = _plausible_security(rows)
+    implausible = int((~ok).sum())
+    rows = rows[ok]
+    if len(rows) < MIN_SECURITY_ROWS:
+        return None
     sec_lakh = pd.to_numeric(rows["security_bdt"], errors="coerce").astype(float) / TAKA_PER_LAKH
     log_ratio = np.log(rows["lakh"].to_numpy() / sec_lakh.to_numpy())
-    model = {"global": float(np.median(log_ratio)), "by_method": {}, "by_entity": {}, "n": int(len(rows))}
+    model = {"global": float(np.median(log_ratio)), "by_method": {}, "by_entity": {},
+             "n": int(len(rows)), "implausible_dropped": implausible,
+             "max_lakh": float(rows["lakh"].max())}
     for method, idx in rows.groupby("method").groups.items():
         if method and len(idx) >= MIN_GROUP_ROWS:
             model["by_method"][str(method)] = float(np.median(log_ratio[rows.index.get_indexer(idx)]))
@@ -435,8 +465,10 @@ def _evaluate_security_route(pdf: pd.DataFrame) -> dict:
     earlier ones, scored on the later ones. It is a smaller and more recent window than the history
     route's, which is why it is reported separately and never folded into a single headline.
     """
-    rows = pdf[_has_security(pdf)].sort_values("signed_on")
-    out = {"security_route_n_total": int(len(rows))}
+    rows = pdf[_has_security(pdf)]
+    implausible = int((~_plausible_security(rows)).sum())
+    rows = rows[_plausible_security(rows)].sort_values("signed_on")
+    out = {"security_route_n_total": int(len(rows)), "security_rows_implausible": implausible}
     if len(rows) < 2 * MIN_SECURITY_ROWS:
         return out
     signed = rows["signed_on"].astype(str)
@@ -463,6 +495,7 @@ def _evaluate_security_route(pdf: pd.DataFrame) -> dict:
         "security_mape": round(float(np.median(np.abs(q50[ok] - actual[ok]) / actual[ok])), 4),
         "security_coverage_80": round(float(inside[ok].mean()), 4),
         "security_band_width_median": round(float(np.median(q90[ok] / np.maximum(q10[ok], 1e-9))), 2),
+        "security_by_value": _by_value(actual[ok], q50[ok], q10[ok], q90[ok]),
     })
     # A band ages. The share buyers ask for drifts, and the spread of awards around it has widened
     # month by month, so a band set in June covers June better than September. The model retrains
@@ -592,7 +625,8 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     # nightly retrain would do. The figures published for this route come from the separate,
     # earlier-only fit in _evaluate_security_route, never from this one.
     with_sec = (past if _has_security(past).sum() >= MIN_SECURITY_ROWS else pdf)
-    with_sec = with_sec[_has_security(with_sec)].sort_values("signed_on")
+    with_sec = with_sec[_has_security(with_sec)]
+    with_sec = with_sec[_plausible_security(with_sec)].sort_values("signed_on")
     sec_model = _fit_security(with_sec)
     sec_lo = sec_hi = 0.0
     if sec_model and len(with_sec) >= 2 * MIN_SECURITY_ROWS:
@@ -640,6 +674,74 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     existing["award_value_model"] = metrics
     mpath.write_text(json.dumps(existing, indent=2) + chr(10), encoding="utf-8")
     return metrics
+
+
+# --------------------------------------------------------------------------- value-weighted scoring
+
+def _weighted_coverage(inside: np.ndarray, weights: np.ndarray) -> float | None:
+    """Coverage with each award counted in proportion to a weight instead of one vote each."""
+    w = np.asarray(weights, dtype=float)
+    keep = np.isfinite(w) & (w > 0)
+    total = float(w[keep].sum())
+    if not np.isfinite(total) or total <= 0:
+        return None
+    return round(float((inside[keep] * w[keep]).sum() / total), 4)
+
+
+def _by_value(actual: np.ndarray, q50: np.ndarray, q10: np.ndarray, q90: np.ndarray) -> dict:
+    """How a route performs across tender sizes, and how much of the money it was right about.
+
+    The size bands are cut on the model's own estimate, never on the award that landed. Cutting on
+    the award answers a different question and answers it wrongly: the largest actual awards are,
+    by the arithmetic of selection, disproportionately the ones the model guessed low on, so that
+    cut makes any honest model look as though it collapses on big tenders. Measured that way this
+    route appeared to cover 52 percent of the largest one percent; cut on the estimate, which is
+    all a reader has in advance, it covers 73.
+
+    The two weighted coverages differ for a related reason. An award that escapes its band mostly
+    escapes upward, so it carries more taka than one that lands inside, and coverage counted per
+    taka awarded therefore sits below coverage counted per tender. Both are reported: the first is
+    what one tender meets, the second is what a year of them adds up to.
+    """
+    inside = (actual >= q10) & (actual <= q90)
+    ape = np.abs(q50 - actual) / np.maximum(actual, 1e-9)
+    width = q90 / np.maximum(q10, 1e-9)
+    escaped = ~inside
+    out = {
+        "coverage_per_tender": round(float(inside.mean()), 4),
+        "coverage_per_taka_estimated": _weighted_coverage(inside, q50),
+        "coverage_per_taka_awarded": _weighted_coverage(inside, actual),
+        "mean_error": round(float(ape.mean()), 4),
+        "mean_error_per_taka_awarded": (
+            round(float((ape * actual).sum() / actual.sum()), 4) if actual.sum() > 0 else None),
+    }
+    if escaped.any() and actual[escaped].sum() > 0:
+        above = escaped & (actual > q90)
+        out["share_of_escaped_taka_that_escaped_upward"] = round(
+            float(actual[above].sum() / actual[escaped].sum()), 4)
+    if len(actual) >= 10 * VALUE_STRATA:
+        edges = np.quantile(q50, np.linspace(0, 1, VALUE_STRATA + 1))
+        edges[0], edges[-1] = -np.inf, np.inf
+        which = np.clip(np.digitize(q50, edges[1:-1]), 0, VALUE_STRATA - 1)
+        strata = []
+        for b in range(VALUE_STRATA):
+            m = which == b
+            if m.sum() < 30:
+                continue
+            strata.append({
+                "estimate_from_lakh": round(float(q50[m].min()), 2),
+                "estimate_to_lakh": round(float(q50[m].max()), 2),
+                "awards": int(m.sum()),
+                "mape": round(float(np.median(ape[m])), 4),
+                "coverage_80": round(float(inside[m].mean()), 4),
+                "above_ceiling": round(float((actual[m] > q90[m]).mean()), 4),
+                "below_floor": round(float((actual[m] < q10[m]).mean()), 4),
+                "band_width_median": round(float(np.median(width[m])), 2),
+                "award_over_estimate_median": round(float(np.median(actual[m] / np.maximum(q50[m], 1e-9))), 2),
+            })
+        if strata:
+            out["strata"] = strata
+    return out
 
 
 def _evaluate(bundle: dict, test: pd.DataFrame, live_share: float | None = None,
@@ -693,6 +795,9 @@ def _evaluate(bundle: dict, test: pd.DataFrame, live_share: float | None = None,
             errs = (np.abs(q50[m] - actual[m]) / actual[m])
             out[f"{name}_mape_ci95"] = ci(errs, lambda v: float(np.median(v)))
             out[f"{name}_coverage_ci95"] = ci(inside[m].astype(float), lambda v: float(v.mean()))
+            # A coverage figure counts every tender once. A bidder on a three crore tender is not
+            # one vote among small ones, so the same coverage is also reported per taka.
+            out[f"{name}_by_value"] = _by_value(actual[m], q50[m], q10[m], q90[m])
 
     # The history route is not one thing. Open tendering is far harder to price than a quotation,
     # and open tendering is nearly all of what the route is actually asked to price on the live
@@ -797,10 +902,19 @@ def predict(rows, bundle: dict, date_col: str = "published_at", already_prepared
         if has.any():
             sec_lakh = pd.to_numeric(df.loc[has, "security_bdt"], errors="coerce").to_numpy() / TAKA_PER_LAKH
             centre = np.log(sec_lakh) + _security_log_multiple(sec_model, df.loc[has, "method"].to_numpy(), df.loc[has, "pe_id"].to_numpy())
-            q10[has] = np.exp(centre + bundle["security_lo"])
-            q50[has] = np.exp(centre)
-            q90[has] = np.exp(centre + bundle["security_hi"])
-            basis[has] = "security"
+            # A mis-punctuated security implies an award past anything the country has ever
+            # awarded. Such a row is treated as having no security at all and falls to history,
+            # because a visibly absurd figure costs more trust than a wide band does.
+            cap = SECURITY_IMPLIED_CEILING * float(sec_model.get("max_lakh") or 0.0)
+            sane = np.isfinite(centre) & (sec_lakh > 0)
+            if cap > 0:
+                sane &= np.exp(centre) <= cap
+            at = np.where(has)[0][sane]
+            centre = centre[sane]
+            q10[at] = np.exp(centre + bundle["security_lo"])
+            q50[at] = np.exp(centre)
+            q90[at] = np.exp(centre + bundle["security_hi"])
+            basis[at] = "security"
 
     q10 = np.minimum(q10, q50)
     q90 = np.maximum(q90, q50)

@@ -87,9 +87,14 @@ def main() -> None:
         add(f"| Share of awards inside the band | {pct(aw.get('security_coverage_80'))} | {pct(aw.get('history_coverage_80'))} |")
         add(f"| Typical band, high over low | {num(aw.get('security_band_width_median'))}x | {num(aw.get('history_band_width_median'))}x |")
         add("")
+        bad_sec = aw.get("security_rows_implausible") or 0
         add(f"Of the {aw.get('security_route_n_total', 0):,} awards in the archive whose notice "
-            "published a security, that is every one the route could be scored on without fitting "
-            "and testing on the same rows.")
+            "published a usable security, that is every one the route could be scored on without "
+            "fitting and testing on the same rows."
+            + (f" A further {bad_sec} published a figure that cannot be true -- one 66 lakh award "
+               "lists a security of 804 crore -- and those are dropped from fitting, calibration "
+               "and scoring alike, because a typo left in the calibration slice would stretch the "
+               "band on the strength of nothing." if bad_sec else ""))
         add("")
         decay = aw.get("security_coverage_by_band_age") or {}
         if decay:
@@ -130,6 +135,94 @@ def main() -> None:
                 "project. Nothing here is an average of the two rows: each is measured on its own "
                 "held-out window and reported as itself.")
             add("")
+
+        hist_val = aw.get("history_by_value") or {}
+        sec_val = aw.get("security_by_value") or {}
+        if hist_val or sec_val:
+            add("### Counted per tender, and counted per taka")
+            add("")
+            add("Every coverage figure above counts each tender once. A bidder pricing a three crore "
+                "job is not one vote among small purchases, so the same coverage is also reported "
+                "with each award weighted by its size. The two are different numbers and the gap "
+                "between them is itself a measurement.")
+            add("")
+            add("| | Per tender | Per taka estimated | Per taka awarded |")
+            add("|---|---|---|---|")
+            if sec_val:
+                add(f"| From the tender security | {pct(sec_val.get('coverage_per_tender'))} | "
+                    f"{pct(sec_val.get('coverage_per_taka_estimated'))} | "
+                    f"{pct(sec_val.get('coverage_per_taka_awarded'))} |")
+            if hist_val:
+                add(f"| From entity history | {pct(hist_val.get('coverage_per_tender'))} | "
+                    f"{pct(hist_val.get('coverage_per_taka_estimated'))} | "
+                    f"{pct(hist_val.get('coverage_per_taka_awarded'))} |")
+            add("")
+            upward = (hist_val or sec_val).get("share_of_escaped_taka_that_escaped_upward")
+            if upward is not None:
+                per_taka = [v for v in ((hist_val or sec_val).get("coverage_per_taka_awarded"),) if v]
+                per_all = [v for v in ((hist_val or sec_val).get("coverage_per_tender"),
+                                       (hist_val or sec_val).get("coverage_per_taka_estimated")) if v]
+                lowest = "the lowest of the three" if per_taka and per_all and per_taka[0] < min(per_all)                     else "not the same as the other two"
+                add(f"Coverage per taka awarded is {lowest}, and the reason is "
+                    f"arithmetic rather than a defect. An award that escapes its band mostly escapes "
+                    f"upward -- {pct(upward)} of the taka that fell outside a band fell above its "
+                    "ceiling -- so a miss carries more money than a hit does, and weighting by the "
+                    "award that landed gives those misses more of the total. Weighting by the "
+                    "estimate instead, which is the only size anyone knows before the award, the "
+                    "figure sits close to the per-tender one. The middle column is what a bidder "
+                    "can rely on in advance; the right-hand column is what a year of tenders added "
+                    "up to afterwards.")
+                add("")
+            strata = (hist_val.get("strata") or [])
+            if strata:
+                add("Bands are cut on the model's own estimate, because that is what a reader has "
+                    "before the award. Cutting them on the award that landed would answer a "
+                    "different question and answer it wrongly: the largest actual awards are, by "
+                    "the arithmetic of selection, the ones the model guessed low on, so that cut "
+                    "makes any honest model look as though it collapses on large tenders.")
+                add("")
+                add("| Bidefy's estimate | Tenders | Median error | Inside the band | Above the ceiling | Below the floor |")
+                add("|---|---|---|---|---|---|")
+                for row in strata:
+                    lo, hi = row.get("estimate_from_lakh"), row.get("estimate_to_lakh")
+                    add(f"| {num(lo)} to {num(hi)} lakh | {row.get('awards', 0):,} | "
+                        f"{pct(row.get('mape'))} | {pct(row.get('coverage_80'))} | "
+                        f"{pct(row.get('above_ceiling'))} | {pct(row.get('below_floor'))} |")
+                add("")
+                # Every claim in this paragraph is read off the table above it, so a later retrain
+                # that changes the picture changes the sentence with it.
+                covs = [r.get("coverage_80") or 0 for r in strata]
+                first, last = strata[0], strata[-1]
+                steady = (max(covs) - min(covs)) < 0.10
+                add(f"Coverage runs between {pct(min(covs))} and {pct(max(covs))} across those "
+                    f"bands" + (", so the route does not fall apart on the large end. " if steady
+                                else ", which is a wide enough spread to read as real. ") +
+                    f"What changes is the direction of the misses. In the lowest band "
+                    f"{pct(first.get('above_ceiling'))} of awards overtook the ceiling and "
+                    f"{pct(first.get('below_floor'))} fell through the floor; in the highest band "
+                    f"it is {pct(last.get('above_ceiling'))} and {pct(last.get('below_floor'))}. "
+                    f"The median award lands at {num(first.get('award_over_estimate_median'))} times "
+                    f"the estimate in the lowest band and "
+                    f"{num(last.get('award_over_estimate_median'))} times in the highest. A central "
+                    "estimate pulled toward the middle by weak features looks exactly like that, "
+                    "and the feature it lacks is the quantity, which a notice states only rarely.")
+                add("")
+            sec_strata = sec_val.get("strata") or []
+            if sec_strata:
+                cov = [r.get("coverage_80") or 0 for r in sec_strata]
+                err = [r.get("mape") or 0 for r in sec_strata]
+                wid = [r.get("band_width_median") or 0 for r in sec_strata]
+                small = min(r.get("awards", 0) for r in sec_strata)
+                add(f"The security route is steadier still in what it promises: its band is "
+                    f"{num(min(wid))}x wide in every one of the five size bands"
+                    + ("" if min(wid) == max(wid) else f", at most {num(max(wid))}x") +
+                    f", and its median error runs {pct(min(err))} to {pct(max(err))} across them. "
+                    "The relationship it uses is a multiple, so its error is relative by "
+                    "construction and does not grow with the size of the job. Its coverage moves "
+                    f"more, {pct(min(cov))} to {pct(max(cov))}, but the smallest band holds only "
+                    f"{small:,} awards, where the sampling error on a coverage figure is already "
+                    "well over a point, so that spread is not evidence of anything.")
+                add("")
 
         add(f"Taking the test window exactly as crawled, with whatever mix of routes it happens to "
             f"contain, the median error is {pct(aw.get('mape_acted'))} and the typical band is "

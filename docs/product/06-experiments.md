@@ -120,6 +120,82 @@ spans 1.5 times over the same range. Pricing an award straight off the document 
 error of 51 percent, worse than the history route it would have replaced. The fee is set on coarse
 value slabs, so it says which bracket a tender is in and almost nothing more. Rejected.
 
+### Counting coverage by taka, and the trap in counting it by award size
+
+A coverage figure counts every tender once. A bidder pricing a three crore job is not one vote
+among small purchases, so the question was asked again with each award weighted by its size. The
+accuracy page now publishes coverage three ways: per tender, per taka of the estimate, and per taka
+actually awarded. They are different numbers, and the gap between them is itself a measurement.
+Coverage per taka awarded is the lowest, because an award that escapes its band mostly escapes
+upward -- on the history route about 92 percent of the taka that fell outside a band fell above its
+ceiling -- so a miss carries more money than a hit and weighting by the award gives misses more of
+the total. Weighted by the estimate, which is the only size known before the award, the figure
+lands close to the per-tender one.
+
+**The first version of this analysis was wrong, and the way it was wrong is worth keeping.** Size
+bands were cut on the award that landed. Measured that way the history route looked as though it
+fell apart on large tenders: coverage of 52.0 percent on the largest one percent against a promised
+80, a median actual award of 1,366 lakh against a median estimate of 595, and 47.4 percent of them
+escaping above the ceiling. Taka-weighted coverage of 62.3 percent against 77.4 per tender seemed
+to confirm it.
+
+It was selection on the outcome. The largest actual awards are, by arithmetic, disproportionately
+the ones a central estimate sat below; picking them by their outcome and then measuring how often
+the estimate was below them measures the selection, not the model. Cut on the model's own estimate
+instead -- which is also all a reader has in advance -- the route is close to flat: coverage runs
+79.0, 78.5, 77.9, 75.6 and 76.1 percent across five bands of rising estimate, median error 37.5 to
+40.4 percent, and the median award comes in at 1.16 times the estimate in the lowest band and 0.97
+in the highest. The largest one percent by estimate covers 72.9 percent, not 52. The published
+bands are therefore cut on the estimate, and the code says why so the mistake is not made again.
+
+What survives is real but smaller than it looked: a mild compression toward the middle, visible as
+small estimates being overtaken from above and large ones undershot from below. It is the signature
+of weak features, not of a band that fails where the money is.
+
+**This also settles the per-size calibration question for good.** Splitting the conformal band by
+size was already rejected twice on marginal coverage. The suspicion here was that it had been
+judged on the wrong metric and would have fixed conditional coverage on large tenders. It would
+not: covering 80 percent of the outcome-selected top one percent around the same centre would need
+a band 36.5 times wide, which is worthless to a bidder, and once the bands are cut on the estimate
+there is no conditional coverage gap left to fix. Rejected a third time, now for the right reason.
+
+### The award band inherits the classifier's noise, and does not say so
+
+Running the two versions of this change back to back on identical fit data moved the history
+route's coverage by 0.9 points and its band from 5.06x to 4.94x. Only seventy rows in the test
+window can be attributed to the change itself, so almost none of that was the change. The cause is
+that the classifier is refitted in the same nightly sequence, its confidence bar moved from 0.6977
+to 0.6991, and the award model takes the resulting category as a feature. A category that shifts
+for rows near the bar perturbs the award band everywhere.
+
+The category page publishes its own noise floor, and says a figure quoted without one invites
+reading an improvement into noise. The award page does not, and on this evidence its coverage is
+not stable to better than about a point across refits. That is a gap in the same apparatus, found
+by accident, and it is written down here rather than fixed in the same change.
+
+### A mis-punctuated security, and why a value-weighted figure found it
+
+Weighting coverage by the estimate returned 36 percent on the security route against 83 per tender,
+a gap far too large to be the effect the history route showed. One row caused it. Tender 1178309 records a 66 lakh award against a published security of
+804 crore, which implies an award of some 29 lakh crore -- more than the national budget. The
+figure is a typo in the notice or in parsing it, not a buyer with an unusual habit.
+
+Seventy rows in 26,121 are like it: forty-five where the security is more than a fifth of the
+award, twenty-five where the award is over three hundred times it. The real multiple has a median
+of 35.4 and runs from 20 at the first percentile to 65 at the ninety-ninth, so those rows sit
+nowhere near the distribution. They are now dropped from fitting, from calibration and from scoring alike,
+because one of them in the calibration slice would stretch the band on the strength of a typo. At serving time the
+award is unknown, so the guard is different: an implied award more than five times the largest ever
+awarded is treated as no security at all and the tender falls to the history route. A wide band
+costs less trust than a visibly absurd number does.
+
+No live tender was affected on the day this was found -- the largest estimate being served was 143
+crore -- but the multiplier had been fitted on the bad rows, and one such notice arriving on any
+night would have put a nonsense figure on a tender page.
+
+A value-weighted metric found a data bug that a per-tender metric had hidden for months, which is
+an argument for publishing both beyond the honesty of it.
+
 ## Category
 
 ### First, how much does this model move when nothing changes?

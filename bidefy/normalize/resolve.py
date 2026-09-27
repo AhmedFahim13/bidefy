@@ -72,7 +72,7 @@ def _similar_pairs(norms: list[str], idx: list[int], floor: float) -> list[tuple
     m = vec.fit_transform([norms[i] for i in idx])
     sims = (m @ m.T).tocoo()
     pairs = []
-    for r_, c_, v in zip(sims.row, sims.col, sims.data):
+    for r_, c_, v in zip(sims.row, sims.col, sims.data, strict=True):
         if r_ < c_ and v >= floor:
             pairs.append((idx[r_], idx[c_], float(v)))
     return pairs

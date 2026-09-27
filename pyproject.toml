@@ -18,6 +18,8 @@ dependencies = [
 dev = [
     "pillow>=12.3.0",
     "pytest>=8",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.14",
 ]
 
 [build-system]
@@ -30,3 +32,55 @@ packages = ["bidefy"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+# The codebase writes dense lines on purpose and reflowing 78 of them would be churn, not a fix, so
+# line length is not enforced. What is enforced is the class of thing a reader cannot see: an unused
+# import that hides a missing dependency, a mutable default, a bare except swallowing a real error,
+# a comparison that is always true.
+line-length = 120
+target-version = "py312"
+exclude = ["probe", "docs"]
+
+[tool.ruff.lint]
+select = [
+    "F",      # pyflakes: undefined names, unused imports, f-strings without placeholders
+    "E4", "E7", "E9",   # real syntax and comparison mistakes, not whitespace
+    "B",      # bugbear: mutable defaults, loop-variable capture, useless expressions
+    "SIM",    # simplifications that change behaviour when got wrong
+    "UP",     # constructs superseded by the Python this project requires
+    "RUF",
+]
+ignore = [
+    "E501",   # see line-length above
+    "B008",   # a call in a default is idiomatic for the argparse and Path helpers here
+    "SIM108", # a ternary is not always clearer than the if it replaces
+    "E702",   # paired appends on one line are this codebase's style, not an accident
+    "E731",   # a named lambda is the clearest form for the one-line helpers here
+    "E741",   # one loop variable in a parser is called l for a line
+    "RUF046", # int() around a numpy integer is what makes it JSON-serialisable; removing it breaks
+              # json.dumps at runtime, which no test would catch until a nightly run failed
+    "RUF007", # itertools.pairwise is not clearer than the zip it would replace here
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests name their fixtures inline and assert on private helpers on purpose.
+"tests/*" = ["B011", "SIM117"]
+
+[tool.coverage.run]
+source = ["bidefy", "tools"]
+omit = [
+    # Run by hand, once, by a person watching the output: capture_fixtures refreshes the HTML
+    # fixtures from the portal and make_icons draws the PWA icons. A test for either would be a test
+    # that Pillow draws a square. They are excluded from the denominator rather than padded with
+    # tests nobody would trust, which is the honest way to leave something uncovered.
+    "tools/capture_fixtures.py",
+    "tools/make_icons.py",
+]
+
+[tool.coverage.report]
+# A floor, not a target. It exists so coverage cannot quietly fall again: tools/write_accuracy_doc.py
+# sat at 6 percent for weeks while writing the product's central artefact, and produced the two worst
+# findings in the last review. Nothing warned, because nothing was watching.
+fail_under = 80
+skip_covered = false

@@ -28,7 +28,7 @@ def main() -> None:
     today = date.today()
     year_ago = (today - timedelta(days=365)).isoformat()
     ninety = (today - timedelta(days=90)).isoformat()
-    name_of = dict(zip(bidders["bidder_id"].to_list(), bidders["canonical_name"].to_list()))
+    name_of = dict(zip(bidders["bidder_id"].to_list(), bidders["canonical_name"].to_list(), strict=True))
 
     per_pe = awarded.group_by("bidder_id", "pe_id", "procuring_entity").len().sort("len", descending=True)
     specialist = per_pe.row(0, named=True)

@@ -61,12 +61,12 @@ phases:
     name: "Week 7: product document, pricing, polish"
     tasks:
       - {id: w7-doc, title: "Full product document", owner: claude, state: done, weight: 3, note: "Ten sections at /doc.html: overview, market, system, buyers, primer, accuracy, experiments, operations, decisions, roadmap and risks"}
-      - {id: w7-pricing, title: "Pricing page with request-access form", owner: claude, state: todo, weight: 2}
+      - {id: w7-pricing, title: "Pricing page with request-access form", owner: claude, state: done, weight: 2, note: "bidefy.vercel.app/pricing: free and Pro compared row by row. The Pro figure is deliberately unset, because the earlier 2,500 taka placeholder was a guess and the form asks what people pay today instead"}
       - {id: w7-polish, title: "Polish, stale banner, dashboard final", owner: claude, state: done, weight: 2, note: "Dashboard shows headline model figures rather than every key; live links added; stale banner trips at 36 hours"}
   - id: w8
     name: "Week 8: usage, demo, outreach"
     tasks:
-      - {id: w8-usage, title: "Usage numbers collected and shown", owner: claude, state: todo, weight: 2}
+      - {id: w8-usage, title: "Usage numbers collected and shown", owner: claude, state: done, weight: 2, note: "/api/v1/usage plus a command-centre card. Demand is honestly zero until the launch post goes out; the hourly alert run is now recorded, so liveness and tenders examined are real from the first hour"}
       - {id: w8-demo, title: "Record two-minute demo video", owner: fahim, state: todo, weight: 2}
       - {id: w8-outreach, title: "Message the four Advanced AI Lab product managers", owner: fahim, state: todo, weight: 3}
       - {id: w8-bkash, title: "bKash merchant account for the Pro tier (later)", owner: fahim, state: todo, weight: 1}

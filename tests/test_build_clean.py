@@ -16,7 +16,7 @@ def _tender(i, pe="Taxes Zone-Faridpur", status="Live"):
 def _contract(i, awardee, pe="Taxes Zone-Faridpur", value=0.5):
     return {"tender_id": str(i), "reference": f"R{i}", "title": f"Contract {i}", "advertised_at": "2026-08-01T10:00",
             "ministry": "Ministry of Finance", "procuring_entity": pe, "method": "OTM", "district": "Faridpur",
-            "signed_on": "2026-09-0%d" % (1 + i % 8), "awardee": awardee, "value_crore": value}
+            "signed_on": f"2026-09-0{1 + i % 8}", "awardee": awardee, "value_crore": value}
 
 
 def _seed(root: Path):

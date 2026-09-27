@@ -17,7 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 import joblib
@@ -33,6 +33,7 @@ from collections import defaultdict
 
 from ..crawler import store
 from . import cpv
+from . import gate
 from .categories import label_from_tags, label_margin
 
 TARGET_ACCURACY = 0.93     # the bar is set to deliver this, rather than picked by hand
@@ -101,14 +102,14 @@ def compose(titles, entities=None, ministries=None, briefs=None, natures=None, m
     ministries = list(ministries) if ministries is not None else [""] * n
     briefs = list(briefs) if briefs is not None else [""] * n
     texts = [f"{t or ''} || {e or ''} || {m or ''} || {b or ''}"
-             for t, e, m, b in zip(titles, entities, ministries, briefs)]
+             for t, e, m, b in zip(titles, entities, ministries, briefs, strict=True)]
     if natures is None and methods is None:
         return texts
     # The buyer declares Goods, Works or Services and a procurement method on every notice. Both
     # exist for archived tenders too, and they separate construction from supplies cleanly.
     natures = list(natures) if natures is not None else [""] * n
     methods = list(methods) if methods is not None else [""] * n
-    return [f"{x} || nature_{_slug(nat)} method_{_slug(meth)}" for x, nat, meth in zip(texts, natures, methods)]
+    return [f"{x} || nature_{_slug(nat)} method_{_slug(meth)}" for x, nat, meth in zip(texts, natures, methods, strict=True)]
 
 
 def _labelled(data_root: Path) -> pl.DataFrame:
@@ -225,6 +226,87 @@ def _threshold_for_accuracy(conf: np.ndarray, correct: np.ndarray, target: float
     return float(ordered_conf[int(ok.max())]) if len(ok) else FALLBACK_THRESHOLD
 
 
+def _reaches(conf: np.ndarray, correct: np.ndarray, target: float) -> bool:
+    """Whether any confidence bar on these rows delivers the target accuracy at all.
+
+    _threshold_for_accuracy answers an unreachable target with FALLBACK_THRESHOLD rather than a
+    refusal, which is right for serving and wrong for measurement: a bar of 0.60 where the real one
+    is 0.70 acts on far more rows and would be published as though it had been chosen to hit the
+    target. So the caller asks first.
+    """
+    order = np.argsort(-conf)
+    running = np.cumsum(correct[order].astype(float)) / np.arange(1, len(conf) + 1)
+    return bool((running >= target).any())
+
+
+def _threshold_optimism(conf: np.ndarray, correct: np.ndarray, rows: np.ndarray,
+                        target: float, seed: int = 0) -> dict:
+    """What the published figures owe to choosing the bar on the rows they are then scored on.
+
+    The confidence bar is set to deliver the target accuracy, and it is set on the same pooled
+    cross-validated predictions the accuracy and deferral are then read off. That is the shape of
+    mistake this project already caught twice elsewhere: an in-sample band looked like 1.32x while
+    covering 75.5 percent, and keyword labels raised a published accuracy while destroying the real
+    one. Selecting one scalar on tens of thousands of predictions is a far milder version, but mild
+    is a measurement, not an assumption.
+
+    So the tenders are split in half, the bar is chosen on one half and the accuracy and deferral
+    are read off the other, both ways round, and the average is reported beside the in-sample pair.
+    The split is by tender, not by prediction: each tender appears once per repeat, so splitting on
+    predictions would put the same tender on both sides and measure nothing.
+    """
+    ids = np.unique(rows)
+    if len(ids) < 4 * MIN_LABELS:
+        return {}
+    rng = np.random.default_rng(seed)
+    half = set(rng.choice(ids, size=len(ids) // 2, replace=False).tolist())
+    left = np.array([r in half for r in rows])
+    accs, defs = [], []
+    for pick in (left, ~left):
+        other = ~pick
+        if not pick.any() or not other.any():
+            return {}
+        if not _reaches(conf[pick], correct[pick], target):
+            return {}      # the bar would be a fallback, and a fallback is not a measurement
+        bar = _threshold_for_accuracy(conf[pick], correct[pick], target)
+        acted = conf[other] >= bar
+        if not acted.any():
+            return {}
+        accs.append(float(correct[other][acted].mean()))
+        defs.append(float(1 - acted.mean()))
+    return {"accuracy_acted_heldout_bar": round(sum(accs) / 2, 4),
+            "deferral_rate_heldout_bar": round(sum(defs) / 2, 4)}
+
+
+def _cost_optimal_points(conf: np.ndarray, correct: np.ndarray,
+                         ratios=(1, 2, 3, 5, 10)) -> list[dict]:
+    """Where the trade should sit, for each relative cost of a wrong answer against no answer.
+
+    A wrong category and a missing one are not equally bad, and how much worse the wrong one is
+    nobody has measured: a wrong label hides a tender from the right bidder and shows it to the
+    wrong one, while a declined one still reaches people through the keyword, ministry and status
+    filters. Rather than invent a figure and multiply it by an invented win rate and an invented
+    margin, the cost of a wrong answer is expressed as a multiple of the cost of no answer and
+    swept. The published operating point is not moved by any of this, and must not be: this table
+    says over what range of that multiple the chosen point is the right one, which is a different
+    claim from having optimised it.
+    """
+    order = np.argsort(-conf)
+    ordered = correct[order].astype(float)
+    n = len(ordered)
+    kept = np.arange(1, n + 1)
+    right = np.cumsum(ordered)
+    wrong = kept - right
+    deferred = n - kept
+    out = []
+    for r in ratios:
+        i = int(np.argmin((r * wrong + deferred) / n))
+        out.append({"wrong_answer_costs": r,
+                    "deferral": round(float(deferred[i] / n), 4),
+                    "accuracy": round(float(right[i] / kept[i]), 4)})
+    return out
+
+
 def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACCURACY, seed: int = 0) -> dict | None:
     df = _labelled(Path(data_root))
     if df.is_empty() or df.height < MIN_LABELS:
@@ -248,7 +330,7 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
     entities = df["procuring_entity"].fill_null("").to_list()
     y = np.array(df["label"].to_list())
     folds = min(FOLDS, int(counts.filter(pl.col("label").is_in(list(keep)))["len"].min()))
-    conf_parts, correct_parts, pred_parts, true_parts = [], [], [], []
+    conf_parts, correct_parts, pred_parts, true_parts, row_parts = [], [], [], [], []
     per_repeat: list[tuple[float, float]] = []
     margin = (df["label_margin"].to_numpy() if "label_margin" in df.columns
               else np.ones(df.height, dtype=int))
@@ -273,6 +355,7 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
         conf_parts.append(proba.max(axis=1))
         pred = np.array([classes[i] for i in proba.argmax(axis=1)])
         pred_parts.append(pred); correct_parts.append(pred == y[te]); true_parts.append(y[te])
+        row_parts.append(np.asarray(te))
       r_conf = np.concatenate(conf_parts[mark:]); r_correct = np.concatenate(correct_parts[mark:])
       r_thr = _threshold_for_accuracy(r_conf, r_correct, target_accuracy)
       per_repeat.append((float(1 - (r_conf >= r_thr).mean()),
@@ -280,6 +363,7 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
                                         np.concatenate(pred_parts[mark:]), average="macro"))))
     conf = np.concatenate(conf_parts)
     correct = np.concatenate(correct_parts)
+    rows = np.concatenate(row_parts)
     pred = np.concatenate(pred_parts)
     true = np.concatenate(true_parts)
     threshold = _threshold_for_accuracy(conf, correct, target_accuracy)
@@ -307,14 +391,25 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
         "deferral_spread": round(max(r[0] for r in per_repeat) - min(r[0] for r in per_repeat), 4),
         "macro_f1_spread": round(max(r[1] for r in per_repeat) - min(r[1] for r in per_repeat), 4),
         "scored_with_brief": True,
-        "trained_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "trained_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         **_deferral_for_accuracy(conf, correct),
+        **_threshold_optimism(conf, correct, rows, target_accuracy, seed),
+        "cost_optimal_points": _cost_optimal_points(conf, correct),
     }
+
+    models_dir = Path(models_dir)
+    models_dir.mkdir(parents=True, exist_ok=True)
+    # The gate runs before the final model is even fitted, let alone written. A candidate that lost
+    # more than the measured run-to-run noise allows is filed and discarded, and the bundle already
+    # on disk keeps serving, so the accuracy page goes on describing what a reader actually meets.
+    breaches = gate.check("category_classifier", metrics, models_dir)
+    if breaches:
+        gate.record_blocked(models_dir, "category_classifier", metrics, breaches)
+        print(gate.describe("category_classifier", breaches))
+        return {**metrics, "promoted": False, "breaches": breaches}
 
     final = _pipeline(seed).fit(X_train, y)
     final_classes = list(final.classes_)
-    models_dir = Path(models_dir)
-    models_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump({"model": final, "threshold": threshold, "classes": final_classes, "format": BUNDLE_FORMAT,
                  "use_nature": USE_NATURE, "labeller": LABELLER,
                  "entity_counts": _entity_counts(entities, y, final_classes, range(len(y))),
@@ -323,8 +418,9 @@ def train(data_root: Path, models_dir: Path, target_accuracy: float = TARGET_ACC
     mpath = models_dir / "metrics.json"
     existing = json.loads(mpath.read_text(encoding="utf-8")) if mpath.exists() else {}
     existing["category_classifier"] = metrics
-    mpath.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
-    return metrics
+    mpath.write_text(json.dumps(gate.clear_blocked(existing, "category_classifier"), indent=2) + "\n",
+                     encoding="utf-8")
+    return {**metrics, "promoted": True}
 
 
 def load(models_dir: Path) -> dict | None:
@@ -364,6 +460,11 @@ def main(argv: list[str] | None = None) -> int:
         if m is None:
             print("classifier: not enough portal-tagged labels yet, nothing trained")
             return 0
+        if not m.get("promoted", True):
+            # Exit zero on purpose: this runs before the crawl's data is committed, and a non-zero
+            # exit here would skip that step. tools/check_promotions.py fails the build afterwards.
+            print("classifier: candidate rejected, the previous model keeps serving")
+            return 0
         print(f"classifier: acted accuracy {m['accuracy_acted']:.3f} at deferral {m['deferral_rate']:.3f} "
               f"(bar {m['threshold']} set for a {m['target_accuracy']:.0%} target), "
               f"macro F1 {m['macro_f1']:.3f}, {m['n_labels']} labels across {m['n_classes']} classes "
@@ -374,7 +475,7 @@ def main(argv: list[str] | None = None) -> int:
         print("no model")
         return 1
     samples = ["Purchase of Dot Matrix Printer Ribbon", "Construction of RCC bridge", "Supply of medicine for hospital"]
-    for title, (cat, p) in zip(samples, apply(compose(samples), bundle)):
+    for title, (cat, p) in zip(samples, apply(compose(samples), bundle), strict=True):
         print(f"{cat or '(declined)':28s} {p:.2f}  {title}")
     return 0
 

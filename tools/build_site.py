@@ -123,6 +123,40 @@ def _metrics_table(metrics: dict | None) -> str:
     return "<div class='grid'>" + "".join(f"<div class='card'>{b}</div>" for b in blocks) + "</div>"
 
 
+USAGE_SCRIPT = """<script>
+// Two kinds of number, kept apart. Subscribers and access requests are demand and are zero until
+// the product is in front of someone; saying so in words beats leaving a reader to guess whether a
+// zero is a dead endpoint. The alert-run figures are liveness and are real from the first hour.
+(async () => {
+  const box = document.getElementById("usage");
+  const row = (label, value) => `<li>${label}: <b>${value}</b></li>`;
+  try {
+    // Through the site origin, not workers.dev: some Bangladeshi ISPs block workers.dev, which is
+    // why web/app/api/[...path]/route.ts exists. Fetching it directly would blank this card for
+    // exactly the readers that proxy was built for.
+    const r = await fetch("https://bidefy.vercel.app/api/v1/usage");
+    if (!r.ok) throw new Error(r.status);
+    const u = await r.json();
+    const n = (v) => (v ?? 0).toLocaleString();
+    const when = (v) => (v ? new Date(v).toISOString().slice(0, 16).replace("T", " ") + "Z" : "never");
+    const demand = u.has_audience
+      ? row("Subscribers", n(u.subscribers)) + row("Alerts delivered", n(u.alerts_delivered)) +
+        row("Alerts in the last 7 days", n(u.alerts_delivered_in_7_days)) +
+        row("Access requests", n(u.access_requests))
+      : "<li class='muted'>No audience yet. Nobody has subscribed or asked for access, which is "
+        + "what an unlaunched product looks like rather than a fault.</li>";
+    box.innerHTML = "<ul>" + demand
+      + row("Alert runs recorded", n(u.alert_runs))
+      + row("Tenders the matcher examined", n(u.tenders_examined))
+      + (u.alert_runs_that_threw ? row("Runs that threw", n(u.alert_runs_that_threw)) : "")
+      + row("Last alert run", when(u.last_alert_run_at)) + "</ul>";
+  } catch (e) {
+    box.innerHTML = "<div class='muted'>Usage endpoint did not answer (" + e.message + ").</div>";
+  }
+})();
+</script>"""
+
+
 def render_dashboard(status: dict, p: dict, crawl: dict, metrics: dict | None) -> str:
     crawl_rows = "".join(
         f"<tr><td>{html.escape(ep)}</td><td>{c.get('next_page', 1) - 1:,} / {c.get('total_pages', 0):,}</td>"
@@ -146,7 +180,9 @@ def render_dashboard(status: dict, p: dict, crawl: dict, metrics: dict | None) -
     <li><a href="https://bidefy.iba-jobs.workers.dev/api/v1/health">API health</a></li>
     <li><a href="doc.html">Product document, including what it gets right</a></li>
     <li><a href="https://github.com/AhmedFahim13/bidefy/actions">Nightly runs</a></li></ul></div>
+  <div class="card"><div class="muted">Usage</div><div id="usage"><div class="muted">Loading&hellip;</div></div></div>
 </div>
+{USAGE_SCRIPT}
 <h2>Crawl</h2><div class="card"><table><tr><th>Endpoint</th><th>Pages</th><th>Last run</th><th>Updated</th></tr>{crawl_rows}</table></div>
 <h2>Models</h2>{metrics_html}
 <h2>Done</h2><div class="card"><ul>{''.join(_task_li(t) for t in p['done']) or '<li>Nothing yet</li>'}</ul></div>

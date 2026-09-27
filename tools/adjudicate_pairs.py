@@ -99,7 +99,8 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
 
     path = ROOT / a.review
-    rows = list(csv.DictReader(open(path, newline="", encoding="utf-8")))
+    with path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
     counts = {"merge": 0, "keep": 0, "": 0, "already": 0}
     decided: list[tuple[str, str, str]] = []
     undecided: list[tuple[str, str, str]] = []

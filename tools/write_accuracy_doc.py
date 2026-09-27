@@ -20,6 +20,31 @@ def num(v, digits: int = 2) -> str:
     return "n/a" if v is None else f"{v:,.{digits}f}".rstrip("0").rstrip(".")
 
 
+def _fmt(figure: dict):
+    """The right formatter for a tracked figure: a share, a multiple, or a score."""
+    kind = figure.get("kind", "pct")
+    if kind == "multiple":
+        return lambda v: f"{v:,.2f}x"
+    if kind == "score":
+        return lambda v: f"{v:.3f}"
+    return pct
+
+
+def _direction(figure: dict) -> str:
+    """Whether a tracked figure's movement across the window is better, worse, or noise.
+
+    Which way is better depends on the figure: down for an error or a deferral, up for a coverage or
+    an F1. Judging by the size of the move alone would let a regression be printed as the
+    improvement of the week, and nobody edits this page by hand to catch it.
+    """
+    step = figure.get("typical_step") or 0
+    net = figure.get("net_change") or 0
+    if not step or abs(net) <= 3 * step:
+        return "noise"
+    good = (net < 0) if figure.get("better", "up") == "down" else (net > 0)
+    return "better" if good else "worse"
+
+
 def live_category_sources() -> tuple[int, float] | None:
     """How many live tenders take their category from the portal rather than from the model."""
     path = ROOT / "data" / "clean" / "tenders.parquet"
@@ -41,6 +66,8 @@ def main() -> None:
         OUT.write_text("# Accuracy\n\nNo models have been trained yet.\n", encoding="utf-8")
         return
     m = json.loads(metrics_path.read_text(encoding="utf-8"))
+    stab_path = ROOT / "models" / "stability.json"
+    stab = json.loads(stab_path.read_text(encoding="utf-8")) if stab_path.exists() else {}
     cat = m.get("category_classifier", {})
     aw = m.get("award_value_model", {})
     lines: list[str] = []
@@ -57,6 +84,28 @@ def main() -> None:
         "have seen: the portal's own records, never a rule Bidefy wrote.")
     add("")
 
+    blocked = m.get("blocked") or {}
+    if blocked:
+        # Said before any figure, because it changes what every figure below means: they describe the
+        # model a reader meets, which is no longer the newest one that was fitted.
+        add("## A candidate was rejected, and these are the figures of the model still serving")
+        add("")
+        add("Each nightly run fits a new model and compares it with the one already serving. A "
+            "candidate that lost more ground than that figure has ever been seen to move between "
+            "runs is refused, the previous model stays, and this page goes on describing the "
+            "previous model, because describing a model nobody is served would be worse than "
+            "useless. Every figure below therefore belongs to what a reader actually meets.")
+        add("")
+        for section, entry in blocked.items():
+            add(f"The {section.replace('_', ' ')} candidate trained at {entry.get('at', 'n/a')} was "
+                "refused on:")
+            add("")
+            add("| Figure | Serving | Candidate | Lost | Tolerated |")
+            add("|---|---|---|---|---|")
+            for b in entry.get("breaches", []):
+                add(f"| {b['figure']} | {num(b['was'], 4)} | {num(b['now'], 4)} | "
+                    f"{num(b['lost'], 4)} | {num(b['tolerated'], 4)} |")
+            add("")
     if aw:
         add("## Award value")
         add("")
@@ -87,6 +136,15 @@ def main() -> None:
         add(f"| Share of awards inside the band | {pct(aw.get('security_coverage_80'))} | {pct(aw.get('history_coverage_80'))} |")
         add(f"| Typical band, high over low | {num(aw.get('security_band_width_median'))}x | {num(aw.get('history_band_width_median'))}x |")
         add("")
+        ci_cov, ci_err = aw.get("history_coverage_ci95") or [], aw.get("history_mape_ci95") or []
+        if len(ci_cov) == 2 and len(ci_err) == 2:
+            add(f"The history route's figures carry a bootstrapped 95 percent interval: coverage "
+                f"between {pct(ci_cov[0])} and {pct(ci_cov[1])}, median error between "
+                f"{pct(ci_err[0])} and {pct(ci_err[1])}. That is the interval from sampling alone, "
+                "on this many awards, and it is the narrowest of the several ways these numbers "
+                "move. The run-to-run figures further down are wider, and those are the ones to "
+                "judge a change against.")
+            add("")
         bad_sec = aw.get("security_rows_implausible") or 0
         add(f"Of the {aw.get('security_route_n_total', 0):,} awards in the archive whose notice "
             "published a usable security, that is every one the route could be scored on without "
@@ -111,9 +169,9 @@ def main() -> None:
             for label, row in decay.items():
                 add(f"| {label} | {row.get('awards', 0):,} | {pct(row.get('coverage_80'))} |")
             add("")
-            add(f"The first row is the one the product runs at. The last is what the same band is worth "
-                f"months after it was set, and it is the figure in the table above, because measuring "
-                f"against the whole window is the conservative choice.")
+            add("The first row is the one the product runs at. The last is what the same band is worth "
+                "months after it was set, and it is the figure in the table above, because measuring "
+                "against the whole window is the conservative choice.")
             add("")
         share = aw.get("live_security_share")
         if share is not None and aw.get("security_mape") is not None:
@@ -296,6 +354,59 @@ def main() -> None:
         add(f"| Deferral needed to reach 93 percent | {pct(cat.get('deferral_for_93'))} |")
         add(f"| Deferral needed to reach 95 percent | {pct(cat.get('deferral_for_95'))} |")
         add("")
+        heldout_acc = cat.get("accuracy_acted_heldout_bar")
+        heldout_def = cat.get("deferral_rate_heldout_bar")
+        if heldout_acc is not None and heldout_def is not None:
+            add("### The bar is chosen on the same rows it is scored on")
+            add("")
+            add("The confidence bar is not picked by hand; it is set to deliver the target "
+                "accuracy. But it is set on the same pooled cross-validated predictions the "
+                "accuracy and deferral above are then read off, so those two figures are the best "
+                "case by construction. This project has been caught by that shape of mistake twice "
+                "already, so here it is measured rather than assumed. Splitting the tenders in "
+                "half, choosing the bar on one half and scoring the other, both ways round, the "
+                f"model delivers {pct(heldout_acc)} accuracy at {pct(heldout_def)} deferral.")
+            add("")
+            gap_a = (cat.get("accuracy_acted") or 0) - heldout_acc
+            gap_d = heldout_def - (cat.get("deferral_rate") or 0)
+            add(f"Against a bar the scored rows did not help choose, the published accuracy is "
+                f"{pct(abs(gap_a))} {'optimistic' if gap_a > 0 else 'conservative'} and the "
+                f"published deferral {pct(abs(gap_d))} "
+                f"{'optimistic' if gap_d > 0 else 'conservative'}. The pair above is kept as the "
+                "headline because it is the pair the served model runs at, and this paragraph is "
+                "what it costs to say so honestly.")
+            add("")
+        points = cat.get("cost_optimal_points") or []
+        if points:
+            add("### Where the sweet spot is, and what it depends on")
+            add("")
+            add("A wrong category and a missing one are not equally bad. A wrong one hides a tender "
+                "from the bidder who wanted it and shows it to one who did not; a declined one "
+                "still reaches people through the keyword, ministry and status filters. How much "
+                "worse the wrong one is has not been measured, and turning it into taka would mean "
+                "multiplying three figures nobody has: whether a reader would have bid, whether "
+                "they would have won, and on what margin. So it is left as a ratio and swept.")
+            add("")
+            add("| A wrong answer costs this many silences | Deferral that minimises the total | Accuracy there |")
+            add("|---|---|---|")
+            for row in points:
+                add(f"| {row['wrong_answer_costs']}x | {pct(row['deferral'])} | {pct(row['accuracy'])} |")
+            add("")
+            here = cat.get("deferral_rate") or 0
+            near = [r["wrong_answer_costs"] for r in points if abs(r["deferral"] - here) <= 0.05]
+            span = f"{near[0]} to {near[-1]}" if len(near) > 1 else (str(near[0]) if near else "")
+            add((f"The operating point above is where this table puts it for a ratio of {span}, and "
+                 "that is the whole claim: not that the point is optimal, but over what range of a "
+                 "number nobody has measured it would be. "
+                 if near else
+                 "No row of this table matches the operating point above, which is worth saying "
+                 "plainly: the point is a judgement this table does not support at any ratio in "
+                 "it. ")
+                + "Below that range the model should answer everything and let readers judge; "
+                  "above it, decline far more. Nothing here moved the operating point, and nothing "
+                  "here may: a threshold shifted to improve a published figure trades one number "
+                  "for another without the model getting any better.")
+            add("")
         if cat.get("repeats", 1) > 1:
             add(f"This model is not deterministic. Run the same cross-validation again, on the same "
                 f"data with the same seed, and the share it declines moves by up to "
@@ -312,6 +423,70 @@ def main() -> None:
                 "detail crawl has collected enough of them.")
             add("")
 
+    figs = stab.get("figures") or {}
+    if figs and stab.get("runs", 0) >= 3:      # the tool itself withholds figures below its own floor
+        add("## How much these numbers move between runs")
+        add("")
+        add("Both models retrain on every nightly run, and every run rewrites this page. So how "
+            "much a figure moves when nothing has been changed can be read straight out of the "
+            "repository's history rather than estimated from it. Below are the last "
+            f"{stab['runs']} training runs, from {stab.get('from', 'n/a')} to "
+            f"{stab.get('to', 'n/a')}.")
+        add("")
+        add("| Figure | Then | Now | Typical step between runs | Widest spread |")
+        add("|---|---|---|---|---|")
+        for v in figs.values():
+            f = _fmt(v)
+            add(f"| {v['label']} | {f(v['first'])} | {f(v['last'])} | "
+                f"{f(v['typical_step'])} | {f(v['spread'])} |")
+        add("")
+        # Only percentages are comparable to each other, so the widest-spread claim is made over
+        # those alone; a 0.16 band-width spread is not "16 percent" of anything.
+        steady = [v for v in figs.values()
+                  if v["expected_steady"] and v["typical_step"] and v.get("kind", "pct") == "pct"]
+        if steady:
+            worst = max(steady, key=lambda v: v["spread"])
+            add("This is the floor below which a change to either model cannot be told from the "
+                "weather. The figures meant to hold still move by a few tenths of a point between "
+                f"runs and by up to {pct(worst['spread'])} across the week, so a result smaller "
+                "than that is not a result. Three sources are mixed together here and are not "
+                "separated: each model's own randomness, the award model taking the category as a "
+                "feature and so inheriting the classifier's refit, and the archive growing every "
+                "night.")
+            add("")
+        # Whether a move is good depends on the figure: down is better for an error or a deferral,
+        # up for a coverage or an F1. Describing movement by its size alone would let a regression be
+        # announced as the improvement of the week, on a page nobody edits by hand.
+        moving = [v for v in figs.values() if not v["expected_steady"] and v["typical_step"]]
+        real = [v for v in moving if abs(v["net_change"]) > 3 * v["typical_step"]]
+        better = [v for v in real if _direction(v) == "better"]
+        worse = [v for v in real if _direction(v) == "worse"]
+        for group, lead in (
+            (better, "Some figures are not meant to hold still, and against that floor their "
+                     "movement is real. It was earned by the detail crawl collecting more of what "
+                     "each model needs, not by any change to a model:"),
+            (worse, "And against the same floor, these moved the wrong way by more than noise "
+                    "explains. They are listed because a page that only reports the figures going "
+                    "the right way is advertising:"),
+        ):
+            if not group:
+                continue
+            add(lead)
+            add("")
+            for v in group:
+                f = _fmt(v)
+                add(f"- {v['label']}: {f(v['first'])} to {f(v['last'])}, a move of "
+                    f"{f(abs(v['net_change']))} against a typical step of {f(v['typical_step'])}.")
+            add("")
+        # Named explicitly rather than found by looking for a zero spread: several other figures
+        # can round to a zero spread over a short window, and this sentence explains only this one.
+        led = figs.get("category_classifier.accuracy_acted")
+        if led and led["spread"] == 0:
+            add(f"{led['label']} sits flat at zero, and that is the design rather than a triumph: "
+                "it is what the confidence bar is set to deliver, so it holds still by construction "
+                "and the deferral beside it is the figure actually being measured. A target met "
+                "exactly, every run, is a dial and not a result.")
+            add("")
     add("## What would move these numbers")
     add("")
     add("The award band is limited by what a notice says. The title carries the item but rarely the "

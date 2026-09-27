@@ -5,9 +5,9 @@ import argparse
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
-from . import parse, store
+from . import lock, parse, store
 from .checkpoint import Checkpoint
 from .session import EgpSession, HttpFailure, SessionExpired
 
@@ -57,6 +57,14 @@ def crawl(
     log: Callable[[str], None] = print,
 ) -> Summary:
     parser = PARSERS[endpoint]
+    # Refuse to be the second crawler on this endpoint. Two of them share one checkpoint, walk the
+    # same pages, and both report success; the only symptom last time was the page rate doubling.
+    with lock.held(checkpoint_path, log=log):
+        return _crawl(session, endpoint, mode, data_root, checkpoint_path, time_budget_s,
+                      parser, now, log)
+
+
+def _crawl(session, endpoint, mode, data_root, checkpoint_path, time_budget_s, parser, now, log) -> Summary:
     cp = Checkpoint.load(checkpoint_path, endpoint=endpoint)
     summary = Summary(endpoint=endpoint, mode=mode)
     started = now()

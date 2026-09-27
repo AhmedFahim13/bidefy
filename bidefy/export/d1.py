@@ -63,7 +63,7 @@ class Watermark:
         tmp.replace(path)
 
     @classmethod
-    def load(cls, path: Path) -> "Watermark":
+    def load(cls, path: Path) -> Watermark:
         if not Path(path).exists():
             return cls()
         data = json.loads(Path(path).read_text(encoding="utf-8"))

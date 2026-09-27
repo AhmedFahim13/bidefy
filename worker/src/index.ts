@@ -4,6 +4,7 @@ import { bidderQuery, facetQuery, parseJsonList, parseJsonObject, parseTenderFil
 import { newSubscriptionId, validateSubscription } from "./subscriptions";
 import { runAlerts } from "./alerts";
 import { hashIp, validateAccessRequest } from "./access";
+import { USAGE_SQL, usageParams, usageSummary } from "./usage";
 
 type Bindings = {
   DB: D1Database;
@@ -113,6 +114,14 @@ app.get("/api/v1/stats", async (c) => {
     newest_published: one(3).v ?? null,
     last_fetched: one(4).v ?? null,
   });
+});
+
+app.get("/api/v1/usage", async (c) => {
+  // Counts and timestamps only. Demand is zero until someone arrives and is reported as zero;
+  // the alert-run figures beside it are real from the first hour and say the pipeline is alive.
+  const params = usageParams(new Date());
+  const rows = await c.env.DB.batch(USAGE_SQL.map((sql, i) => c.env.DB.prepare(sql).bind(...params[i])));
+  return c.json(usageSummary(rows.map((r) => (r.results?.[0] as Record<string, unknown> | undefined))));
 });
 
 app.get("/api/v1/push/public-key", (c) => c.json({ key: c.env.VAPID_PUBLIC_KEY ?? "" }));

@@ -50,5 +50,5 @@ def test_save_leaves_no_tmp_file_behind(tmp_path):
 def test_load_with_mismatched_endpoint_raises(tmp_path):
     path = tmp_path / "tenders.json"
     Checkpoint(endpoint="tenders").save(path)
-    with pytest.raises(ValueError, match="tenders.*contracts|contracts.*tenders"):
+    with pytest.raises(ValueError, match=r"tenders.*contracts|contracts.*tenders"):
         Checkpoint.load(path, endpoint="contracts")

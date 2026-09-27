@@ -19,8 +19,11 @@ export default function AccessPage() {
           <li><span className="font-medium text-ink">Concentration flags</span> that show repeat-winner patterns with the numbers behind them.</li>
         </ul>
         <p className="mt-6 rounded-sm border border-rule bg-surface p-4 text-sm">
-          <span className="eyebrow">Planned price</span><br />
-          <span className="num text-2xl font-medium">2,500 taka</span> a month, placeholder. Nothing is charged yet. The first group gets it free in exchange for feedback.
+          <span className="eyebrow">Price</span><br />
+          Not set yet, and a guess printed as a plan is worse than no figure at all. Nothing is
+          charged, no payment rail is connected, and the first group gets Pro free for feedback.
+          The <a href="/pricing" className="text-brand">pricing page</a> says how the figure will
+          be arrived at.
         </p>
       </div>
       <AccessForm apiBase="" />

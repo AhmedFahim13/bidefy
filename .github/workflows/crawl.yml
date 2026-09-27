@@ -22,6 +22,7 @@ concurrency:
 
 permissions:
   contents: write
+  issues: write        # an invariant that breaks opens an issue; see the last two steps
 
 jobs:
   crawl:
@@ -34,6 +35,12 @@ jobs:
       EVENT_SCHEDULE: ${{ github.event.schedule }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # tools/metrics_stability.py reads the run-to-run spread of the published figures out of
+          # the history of models/metrics.json. A shallow clone would show one run and report a
+          # noise floor of zero, which is the flattering direction, so fetch enough history to
+          # cover the fortnight it looks back over. Each run makes about two commits.
+          fetch-depth: 120
       - uses: astral-sh/setup-uv@v3
       - run: uv sync
       - name: Decide mode for scheduled runs
@@ -91,8 +98,10 @@ jobs:
           uv run python -m bidefy.normalize.build
           uv run python -m bidefy.models.award train
           uv run python -m bidefy.models.award apply
+          uv run python tools/metrics_stability.py
           uv run python tools/write_accuracy_doc.py
       - name: Commit data
+        id: commit
         run: |
           git config user.name "bidefy-bot"
           git config user.email "bidefy-bot@users.noreply.github.com"
@@ -117,9 +126,55 @@ jobs:
             sleep 15
             attempt=$((attempt + 1))
           done
+      - name: Invariants
+        id: invariants
+        # After the commit, on purpose. Every incident on this project was a step that did the wrong
+        # thing and exited zero, so these assertions exist to fail the job. Running them before the
+        # commit would pay for that with the crawl, which is the worse trade. Running them here also
+        # means a run nobody can vouch for never reaches D1, because a failed step skips the rest.
+        run: uv run python tools/check_pipeline.py | tee "$RUNNER_TEMP/invariants.txt"
+      - name: Raise an issue when an invariant breaks
+        # A check that fails into a log nobody reads is not an alert. A failed workflow does send
+        # mail, but it says only that something failed; an issue carries which invariant, what it
+        # said, and a link to the run, and it stays open until somebody closes it. One issue is
+        # reused so a week of broken nights is one thread rather than fourteen.
+        if: failure() && steps.invariants.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          report="$RUNNER_TEMP/issue.md"
+          {
+            echo "A nightly run produced data that breaks an invariant. The crawl is committed and"
+            echo "safe; the run that produced it is not trustworthy, and the D1 load was skipped."
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/invariants.txt"
+            echo '```'
+            echo
+            echo "$RUN_URL"
+          } > "$report"
+          existing=$(gh issue list --label nightly-invariant --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file "$report"
+          else
+            gh label create nightly-invariant --description "A nightly run broke a pipeline invariant" --color B60205 2>/dev/null || true
+            gh issue create --title "Nightly invariants broken" --label nightly-invariant --body-file "$report"
+          fi
+      - name: Close the issue once the invariants hold again
+        if: success() && steps.invariants.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Leaving a stale alert open is how people learn to ignore alerts.
+          for n in $(gh issue list --label nightly-invariant --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "The invariants held on $RUN_URL"
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - name: Load D1
         continue-on-error: true
         env:

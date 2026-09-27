@@ -128,7 +128,7 @@ def _categorise(tenders: pl.DataFrame, models_dir: Path, data_root: Path) -> pl.
     texts = classifier.compose(titles, entities, ministries, [brief_of.get(i, "") for i in ids], natures, methods)
     predicted = classifier.apply(texts, bundle, entities) if bundle else [("", 0.0)] * len(titles)
     categories, confidences, sources = [], [], []
-    for tid, (cat, conf) in zip(ids, predicted):
+    for tid, (cat, conf) in zip(ids, predicted, strict=True):
         tagged = tags.get(tid)
         if tagged:
             categories.append(tagged); confidences.append(1.0); sources.append("portal")

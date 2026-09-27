@@ -71,3 +71,84 @@ def test_train_without_labels_returns_none(tmp_path: Path):
     (tmp_path / "clean").mkdir()
     pl.DataFrame({"tender_id": ["1"], "title": ["x"]}).write_parquet(tmp_path / "clean" / "tenders.parquet")
     assert classifier.train(tmp_path, tmp_path / "models") is None
+
+
+def test_cost_curve_walks_from_answering_everything_to_declining_a_third():
+    """The sweet spot depends on how much worse a wrong label is than no label, so it is swept.
+
+    A model whose confidence carries real signal should answer everything when a wrong answer costs
+    no more than a silence, and decline more and more as a wrong answer gets dearer. The table is
+    published as context; it must never move the operating point.
+    """
+    import numpy as np
+    rng = np.random.default_rng(0)
+    n = 20_000
+    conf = rng.uniform(0.4, 1.0, n)
+    correct = rng.random(n) < conf          # confidence that means something
+    points = classifier._cost_optimal_points(conf, correct)
+    assert [p["wrong_answer_costs"] for p in points] == [1, 2, 3, 5, 10]
+    deferrals = [p["deferral"] for p in points]
+    accuracies = [p["accuracy"] for p in points]
+    assert deferrals == sorted(deferrals)               # dearer mistakes, more silence
+    assert accuracies == sorted(accuracies)             # and higher accuracy on what is left
+    assert deferrals[0] < 0.05                          # at parity, answer nearly everything
+
+
+def test_cost_curve_never_defers_when_confidence_says_nothing():
+    """With confidence that carries no signal there is nothing to select on, so silence buys nothing."""
+    import numpy as np
+    rng = np.random.default_rng(1)
+    n = 20_000
+    conf = rng.uniform(0, 1, n)
+    correct = rng.random(n) < 0.9           # accuracy independent of confidence
+    for p in classifier._cost_optimal_points(conf, correct, ratios=(1, 2)):
+        assert p["deferral"] < 0.02
+
+
+def test_threshold_optimism_is_measured_on_tenders_the_bar_did_not_see():
+    """Choosing the bar on the rows it is scored on flatters the figure. This measures by how much."""
+    import numpy as np
+    rng = np.random.default_rng(2)
+    n_tenders = 4_000
+    rows = np.tile(np.arange(n_tenders), 3)             # three repeats, as the real pool has
+    conf = rng.uniform(0.4, 1.0, len(rows))
+    correct = rng.random(len(rows)) < conf
+    out = classifier._threshold_optimism(conf, correct, rows, 0.93, seed=0)
+    assert set(out) == {"accuracy_acted_heldout_bar", "deferral_rate_heldout_bar"}
+    # The bar was chosen to deliver 0.93 elsewhere, so the held-out accuracy lands near it rather
+    # than exactly on it. A wild miss would mean the split had leaked or the bar was degenerate.
+    assert 0.88 <= out["accuracy_acted_heldout_bar"] <= 0.97
+    # Deferral runs high here only because this synthetic confidence is far weaker than the real
+    # model's: correctness equals confidence, so a 93 percent bar has to cut deep. What is being
+    # checked is that a bar chosen elsewhere still lands near its target, not the level it lands at.
+    assert 0.0 <= out["deferral_rate_heldout_bar"] <= 0.9
+
+
+def test_threshold_optimism_declines_to_answer_when_there_is_too_little_data():
+    import numpy as np
+    rows = np.arange(50)
+    assert classifier._threshold_optimism(np.linspace(0.5, 1, 50), np.ones(50, bool), rows, 0.93) == {}
+
+
+def test_an_unreachable_target_is_not_reported_as_a_measurement():
+    """_threshold_for_accuracy answers an unreachable target with a 0.60 fallback rather than a
+    refusal. Publishing that as a held-out pair would state a bar chosen for one purpose as though
+    it had been chosen for another, and inflate the very optimism gap the paragraph exists to
+    quantify."""
+    import numpy as np
+    rng = np.random.default_rng(0)
+    n_tenders = 2_000
+    rows = np.tile(np.arange(n_tenders), 3)
+    # Reachability hinges on the most confident prediction, because a prefix of one row scores
+    # either 0 or 100 percent. So the case that triggers the fallback is a model whose top-confidence
+    # answer is wrong and which never recovers: here it is wrong at the top and right half the time
+    # after, so no bar delivers 93 percent.
+    conf = np.linspace(1.0, 0.5, len(rows))
+    correct = rng.random(len(rows)) < 0.5
+    correct[0] = False
+    assert classifier._reaches(conf, correct, 0.93) is False
+    assert classifier._threshold_optimism(conf, correct, rows, 0.93, seed=0) == {}
+    # Reachable when the confident rows really are the right ones.
+    conf2 = np.linspace(0.5, 1.0, len(rows))
+    correct2 = conf2 > 0.55
+    assert classifier._reaches(conf2, correct2, 0.93) is True

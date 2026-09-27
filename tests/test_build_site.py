@@ -56,9 +56,19 @@ def test_dashboard_escapes_untrusted_strings():
     status = {"project": "B", "phases": [{"id": "a", "name": "A", "tasks": [
         {"id": "x", "title": "<b>t</b>", "owner": "<i>", "state": "todo", "weight": 1, "note": "<u>"}]}]}
     p = build_site.compute_progress(status)
-    html_out = build_site.render_dashboard(status, p, crawl={}, metrics={"m": {"k": "<script>"}})
+    # trained_at is the metrics field that does reach the page; an arbitrary key like {"m": {"k": ...}}
+    # is never rendered at all, because the table is built from a curated list, so testing escaping
+    # with one of those passes without checking anything.
+    html_out = build_site.render_dashboard(
+        status, p, crawl={}, metrics={"category_classifier": {"trained_at": "<script>"}})
     assert "<b>t</b>" not in html_out and "&lt;b&gt;t&lt;/b&gt;" in html_out
-    assert "<i>" not in html_out and "<u>" not in html_out and "<script>" not in html_out
+    assert "<i>" not in html_out and "<u>" not in html_out
+    # A metric value of "<script>" must arrive escaped. The page carries exactly one script of its
+    # own -- the usage card, which interpolates nothing from status.yaml or the metrics -- so the
+    # check is that the untrusted one was escaped and no second tag appeared, not that the page has
+    # no script at all.
+    assert "&lt;script&gt;" in html_out
+    assert html_out.count("<script>") == 1
     assert 'class="tag "' not in html_out
 
 
@@ -68,3 +78,16 @@ def test_doc_sections_demote_markdown_headings(tmp_path):
     assert sections[0][0] == "Alpha"
     assert "<h3>Sub</h3>" in sections[0][1] and "<h4>Deeper</h4>" in sections[0][1]
     assert "<h2>" not in sections[0][1]
+
+
+def test_movement_is_judged_by_direction_not_by_size():
+    """A deferral that rose by ten times the noise floor is a regression, not the week's win."""
+    from tools import write_accuracy_doc as w
+    fell = {"typical_step": 0.002, "net_change": -0.026, "better": "down"}
+    rose = {"typical_step": 0.002, "net_change": 0.026, "better": "down"}
+    assert w._direction(fell) == "better" and w._direction(rose) == "worse"
+    up = {"typical_step": 0.002, "net_change": 0.018, "better": "up"}
+    down = {"typical_step": 0.002, "net_change": -0.018, "better": "up"}
+    assert w._direction(up) == "better" and w._direction(down) == "worse"
+    assert w._direction({"typical_step": 0.01, "net_change": 0.02, "better": "up"}) == "noise"
+    assert w._direction({"typical_step": 0.0, "net_change": 0.5, "better": "up"}) == "noise"

@@ -74,6 +74,36 @@ async function sendOne(sub: SubRow, n: Notification, vapid: VapidKeys): Promise<
 }
 
 export async function runAlerts(env: AlertEnv, opts: { dry: boolean; siteBase: string }): Promise<RunResult> {
+  // Every real run is recorded, including the ones that found nothing and the ones that threw.
+  // With no subscribers the matcher still examines the tenders published since the last watermark,
+  // so this is the only honest usage number the product has before it has an audience, and the only
+  // evidence the hourly cron is alive. That claim only holds if a failing run leaves a row too:
+  // otherwise an hourly crashloop writes nothing and looks exactly like a cron that never fired.
+  // A dry run is a diagnostic and is not recorded.
+  let result: RunResult | null = null;
+  try {
+    result = await matchAndSend(env, opts);
+    return result;
+  } finally {
+    if (!opts.dry) await record(env, result);
+  }
+}
+
+async function record(env: AlertEnv, r: RunResult | null): Promise<void> {
+  try {
+    await env.DB.prepare(
+      "INSERT OR REPLACE INTO alert_runs (ran_at, candidates, subscriptions, matched, sent, failed, pruned, errored) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+      .bind(new Date().toISOString(), r?.candidates ?? 0, r?.subscriptions ?? 0, r?.matched ?? 0,
+            r?.sent ?? 0, r?.failed ?? 0, r?.pruned ?? 0, r ? 0 : 1)
+      .run();
+  } catch {
+    // Bookkeeping must never cost an alert. The run happened whether or not it was written down.
+  }
+}
+
+async function matchAndSend(env: AlertEnv, opts: { dry: boolean; siteBase: string }): Promise<RunResult> {
   const wm = await env.DB.prepare("SELECT value FROM meta WHERE key = 'alerts_watermark'").first<{ value: string }>();
   const watermark = wm?.value ?? "";
   if (!watermark && !opts.dry) {

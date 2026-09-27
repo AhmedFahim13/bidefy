@@ -1,5 +1,9 @@
 name: CI
 
+# Every language in the repository gets checked on every push. Before this, CI ran pytest alone:
+# the Worker's 34 tests and both TypeScript projects were only type-checked by the deploy workflow,
+# which runs after merge, so a broken Worker reached main and was found by a failed deploy.
+
 on:
   push:
     branches: [main]
@@ -9,11 +13,50 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  python:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
       - run: uv sync
-      - run: uv run pytest
+      - name: Lint
+        run: uv run ruff check .
+      - name: Tests
+        # With coverage, so the floor in pyproject.toml is enforced rather than aspirational.
+        run: uv run pytest --cov --cov-report=term-missing:skip-covered
+      - name: Generated files are generated
+        # The accuracy page promises it cannot drift from the model it describes. This is what makes
+        # that true rather than aspirational: if regenerating it changes a byte, it was hand-edited.
+        run: uv run python tools/check_pipeline.py
+
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run build

@@ -32,7 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="flex gap-6 text-sm font-medium">
               <Link href="/" className="text-ink-2 hover:text-brand">Tenders</Link>
               <Link href="/alerts" className="text-ink-2 hover:text-brand">Alerts</Link>
-              <Link href="/access" className="text-ink-2 hover:text-brand">Pro</Link>
+              <Link href="/pricing" className="text-ink-2 hover:text-brand">Pricing</Link>
               <Link href="/learn" className="text-ink-2 hover:text-brand">Learn</Link>
               <a href={`${API_BASE}/api/v1/health`} className="text-ink-3 hover:text-brand" rel="noreferrer">API</a>
             </nav>

@@ -28,7 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 import joblib
@@ -41,6 +41,7 @@ from sklearn.linear_model import Ridge
 from sklearn.model_selection import KFold
 
 from ..crawler import store
+from . import gate
 
 CAT_COLS = ["pe_id", "ministry", "method", "district", "category"]
 PARAMS = dict(n_estimators=600, learning_rate=0.05, num_leaves=63, min_child_samples=20,
@@ -149,7 +150,12 @@ def _prepare(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
 def _matrix(df: pd.DataFrame, levels: dict[str, list[str]], cols: list[str] | None = None) -> pd.DataFrame:
     out = pd.DataFrame(index=df.index)
     for c in CAT_COLS:
-        out[c] = pd.Categorical(df[c].where(df[c] != "", None), categories=levels[c])
+        # A live tender can name a buyer or a district the training window never saw. Such a value
+        # becomes missing, which is what the model should be told: it has no history to go on. Say
+        # that explicitly rather than handing pandas a value outside the categories and relying on it
+        # to drop it, which it now warns about and will soon refuse to do.
+        known = df[c].where(df[c] != "", None)
+        out[c] = pd.Categorical(known.where(known.isin(levels[c]), None), categories=levels[c])
     for c in (cols or _num_cols()):
         out[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
     return out
@@ -262,7 +268,7 @@ def _security_log_multiple(model: dict, methods: np.ndarray, entities: np.ndarra
         entities = np.array([""] * len(methods))
     return np.array([by_entity.get(str(e)) if by_entity.get(str(e)) is not None
                      else by_method.get(str(m), model["global"])
-                     for m, e in zip(methods, entities)])
+                     for m, e in zip(methods, entities, strict=True)])
 
 
 def _group_keys(df: pd.DataFrame, predicted: np.ndarray | None = None,
@@ -282,7 +288,7 @@ def _group_keys(df: pd.DataFrame, predicted: np.ndarray | None = None,
                 parts.append(np.digitize(predicted, size_edges).astype(str))
         else:
             parts.append(df[col].astype(str).to_numpy())
-    return np.array(["|".join(vals) for vals in zip(*parts)])
+    return np.array(["|".join(vals) for vals in zip(*parts, strict=True)])
 
 
 def _fit_quantile_pair(frame: pd.DataFrame, levels: dict, seed: int):
@@ -650,7 +656,7 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
         "num_cols": _num_cols(), "priors": _prior_tables(past) if USE_ENTITY_PRIORS else {},
         "history": past.groupby("pe_id").size().to_dict(),
         "format": BUNDLE_FORMAT,
-        "version": datetime.now(timezone.utc).strftime("award-%Y%m%d"),
+        "version": datetime.now(UTC).strftime("award-%Y%m%d"),
         "coverage_target": COVERAGE,
         "drift_allowance": cqr.get("drift_pad", round(drift, 3)),
     }
@@ -663,17 +669,27 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     metrics.update({"drift_allowance": cqr.get("drift_pad", round(drift, 3)), "n_fit": len(past), "n_calibration": len(calib), "n_test": len(test),
                     "test_from": str(test["signed_on"].iloc[0]),
                     "train_last_signed": str(past["signed_on"].iloc[-1]),
-                    "trained_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "trained_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "model_version": bundle["version"]})
 
     models_dir = Path(models_dir)
     models_dir.mkdir(parents=True, exist_ok=True)
+    # The gate runs before anything is written. A candidate that lost more than the measured
+    # run-to-run noise allows is filed and discarded, and the model already on disk keeps serving,
+    # so the accuracy page continues to describe what a reader actually meets.
+    breaches = gate.check("award_value_model", metrics, models_dir)
+    if breaches:
+        gate.record_blocked(models_dir, "award_value_model", metrics, breaches)
+        print(gate.describe("award_value_model", breaches))
+        return {**metrics, "promoted": False, "breaches": breaches}
+
     joblib.dump(bundle, models_dir / "award.joblib", compress=3)
     mpath = models_dir / "metrics.json"
     existing = json.loads(mpath.read_text(encoding="utf-8")) if mpath.exists() else {}
     existing["award_value_model"] = metrics
-    mpath.write_text(json.dumps(existing, indent=2) + chr(10), encoding="utf-8")
-    return metrics
+    mpath.write_text(json.dumps(gate.clear_blocked(existing, "award_value_model"), indent=2) + chr(10),
+                     encoding="utf-8")
+    return {**metrics, "promoted": True}
 
 
 # --------------------------------------------------------------------------- value-weighted scoring
@@ -966,6 +982,11 @@ def main(argv: list[str] | None = None) -> int:
         m = train(Path(a.data_root), Path(a.models_dir))
         if m is None:
             print("award model: not enough awards yet, nothing trained")
+            return 0
+        if not m.get("promoted", True):
+            # Exit zero on purpose: this runs before the crawl's data is committed, and a non-zero
+            # exit here would skip that step. tools/check_promotions.py fails the build afterwards.
+            print("award model: candidate rejected, the previous model keeps serving")
             return 0
         print(f"award model: median APE {m['mape_acted']:.3f}, coverage {m['coverage_80']:.3f}, "
               f"deferral {m['deferral_rate']:.3f}, median band {m['band_width_median']}x "

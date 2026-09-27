@@ -6,7 +6,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Callable
+from collections.abc import Callable
 
 BASE = "https://www.eprocure.gov.bd"
 UA = "Mozilla/5.0 bidefy-crawler/0.1 (+https://github.com/AhmedFahim13/bidefy; polite, 1 req/s)"

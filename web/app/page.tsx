@@ -31,7 +31,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
           <p className="mt-3 text-sm">
             <a href="/alerts" className="text-brand">Set up alerts</a>
             <span className="text-ink-3"> · </span>
-            <a href="/access" className="text-brand">Request access to Pro</a>
+            <a href="/pricing" className="text-brand">What Pro costs</a>
           </p>
         </div>
         <div className="grid grid-cols-3 gap-4">

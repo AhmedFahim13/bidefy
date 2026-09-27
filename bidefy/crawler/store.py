@@ -5,7 +5,7 @@ import argparse
 import os
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 import polars as pl
@@ -30,7 +30,7 @@ def append_rows(rows: list[dict], root: Path, endpoint: str) -> Path | None:
     """
     if not rows:
         return None
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     df = pl.DataFrame(rows).with_columns(pl.lit(stamp).alias("fetched_at"))
     out = _dir(root, endpoint)
     out.mkdir(parents=True, exist_ok=True)
@@ -52,7 +52,7 @@ def _read_parts(parts: list[Path], columns: list[str] | None = None) -> list[pl.
     for p in parts:
         try:
             frames.append(pl.read_parquet(p, columns=columns))
-        except Exception as e:  # noqa: BLE001 - a bad part must never break the crawl
+        except Exception as e:
             _warn(f"store: skipping unreadable part {p.name}: {e}")
     return frames
 
@@ -105,13 +105,13 @@ def compact(root: Path, endpoint: str, min_parts: int = DEFAULT_MIN_PARTS) -> Pa
         try:
             frames.append(pl.read_parquet(p))
             consumed.append(p)
-        except Exception as e:  # noqa: BLE001 - a bad part must never break compaction
+        except Exception as e:
             _warn(f"store: skipping unreadable part {p.name}: {e}")
     if not frames:
         return None
     frames = [f.with_columns(pl.col(ID_COLUMN).cast(pl.Utf8)) for f in frames]
     df = pl.concat(frames, how="diagonal_relaxed").sort("fetched_at").unique(subset=[ID_COLUMN], keep="last").sort(ID_COLUMN)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     out = _dir(root, endpoint)
     new_path = out / f"part-{stamp}-compact.parquet"
     tmp = new_path.with_suffix(".parquet.tmp")

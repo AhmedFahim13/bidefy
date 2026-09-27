@@ -4,12 +4,12 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 @dataclass
@@ -44,7 +44,7 @@ class Checkpoint:
         os.replace(tmp, path)
 
     @classmethod
-    def load(cls, path: Path, endpoint: str | None = None) -> "Checkpoint":
+    def load(cls, path: Path, endpoint: str | None = None) -> Checkpoint:
         if not path.exists():
             return cls(endpoint=endpoint or path.stem)
         data = json.loads(path.read_text(encoding="utf-8"))

@@ -6,7 +6,7 @@ import polars as pl
 from bidefy.export import d1
 
 OK = '[{"results": [], "success": true, "meta": {"duration": 1}}]'
-NEVER_SLEEP = lambda seconds: None      # noqa: E731 - keeps the retry tests instant
+NEVER_SLEEP = lambda seconds: None
 
 
 def _tender(tid: str, status: str, published: str, fetched: str, title: str = "t") -> dict:

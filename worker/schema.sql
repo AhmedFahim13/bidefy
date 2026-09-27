@@ -30,3 +30,30 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   created_at TEXT NOT NULL, last_sent_at TEXT
 );
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+
+-- These two arrived as migrations (0001 and 0002) and were missing here, so a database built from
+-- this file alone could not serve /api/v1/usage: a D1 batch fails as a unit, so one absent table
+-- takes the whole endpoint down.
+CREATE TABLE IF NOT EXISTS sent (
+  subscription_id TEXT NOT NULL, tender_id TEXT NOT NULL, sent_at TEXT NOT NULL,
+  PRIMARY KEY (subscription_id, tender_id)
+);
+CREATE TABLE IF NOT EXISTS access_requests (
+  id TEXT PRIMARY KEY, created_at TEXT NOT NULL, name TEXT NOT NULL, organisation TEXT NOT NULL, role TEXT,
+  bids_on TEXT NOT NULL, value_band TEXT NOT NULL, contact TEXT, note TEXT, ip_hash TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_access_created ON access_requests(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS alert_runs (
+  ran_at TEXT PRIMARY KEY,
+  candidates INTEGER NOT NULL DEFAULT 0,
+  subscriptions INTEGER NOT NULL DEFAULT 0,
+  matched INTEGER NOT NULL DEFAULT 0,
+  sent INTEGER NOT NULL DEFAULT 0,
+  failed INTEGER NOT NULL DEFAULT 0,
+  pruned INTEGER NOT NULL DEFAULT 0,
+  -- 1 when the run threw before finishing. Without this a crashloop writes nothing and reads as a
+  -- cron that never fired, which is the distinction this table exists to make.
+  errored INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_alert_runs_ran ON alert_runs(ran_at DESC);

@@ -107,22 +107,22 @@ Of the 57,919 tenders with codes on record, 81.0 percent carry codes that identi
 
 Of the 6,827 tenders open right now, 83.0 percent take their category straight from the portal. For those the category is not a prediction at all, and nothing is declined.
 
-Trained and scored on 46,335 tenders across 13 categories, cross-validated against the sector the portal's CPV codes identify, on tenders whose codes identify one, with buyer priors from the training fold only.
+Trained and scored on 46,895 tenders across 13 categories, cross-validated against the sector the portal's CPV codes identify, on tenders whose codes identify one, with buyer priors from the training fold only.
 
 | Measure | Value |
 |---|---|
 | Accuracy on the predictions it commits to | 93.0 percent |
-| Share of tenders it declines | 13.4 percent |
+| Share of tenders it declines | 13.0 percent |
 | Accuracy if forced to answer every time | 87.0 percent |
-| Macro F1 across categories | 0.711 |
-| Deferral needed to reach 93 percent | 13.4 percent |
-| Deferral needed to reach 95 percent | 19.7 percent |
+| Macro F1 across categories | 0.716 |
+| Deferral needed to reach 93 percent | 13.0 percent |
+| Deferral needed to reach 95 percent | 19.1 percent |
 
 ### The bar is chosen on the same rows it is scored on
 
-The confidence bar is not picked by hand; it is set to deliver the target accuracy. But it is set on the same pooled cross-validated predictions the accuracy and deferral above are then read off, so those two figures are the best case by construction. This project has been caught by that shape of mistake twice already, so here it is measured rather than assumed. Splitting the tenders in half, choosing the bar on one half and scoring the other, both ways round, the model delivers 93.0 percent accuracy at 13.3 percent deferral.
+The confidence bar is not picked by hand; it is set to deliver the target accuracy. But it is set on the same pooled cross-validated predictions the accuracy and deferral above are then read off, so those two figures are the best case by construction. This project has been caught by that shape of mistake twice already, so here it is measured rather than assumed. Splitting the tenders in half, choosing the bar on one half and scoring the other, both ways round, the model delivers 93.0 percent accuracy at 13.0 percent deferral.
 
-Against a bar the scored rows did not help choose, the published accuracy is 0.0 percent optimistic and the published deferral 0.1 percent conservative. The pair above is kept as the headline because it is the pair the served model runs at, and this paragraph is what it costs to say so honestly.
+Against a bar the scored rows did not help choose, the published accuracy is 0.0 percent conservative and the published deferral 0.0 percent optimistic. The pair above is kept as the headline because it is the pair the served model runs at, and this paragraph is what it costs to say so honestly.
 
 ### Where the sweet spot is, and what it depends on
 
@@ -130,11 +130,11 @@ A wrong category and a missing one are not equally bad. A wrong one hides a tend
 
 | A wrong answer costs this many silences | Deferral that minimises the total | Accuracy there |
 |---|---|---|
-| 1x | 0.0 percent | 87.0 percent |
-| 2x | 7.0 percent | 90.5 percent |
-| 3x | 15.5 percent | 93.8 percent |
-| 5x | 23.8 percent | 96.1 percent |
-| 10x | 34.9 percent | 98.1 percent |
+| 1x | 0.0 percent | 87.1 percent |
+| 2x | 5.9 percent | 90.1 percent |
+| 3x | 15.1 percent | 93.7 percent |
+| 5x | 24.6 percent | 96.3 percent |
+| 10x | 34.6 percent | 98.1 percent |
 
 The operating point above is where this table puts it for a ratio of 3, and that is the whole claim: not that the point is optimal, but over what range of a number nobody has measured it would be. Below that range the model should answer everything and let readers judge; above it, decline far more. Nothing here moved the operating point, and nothing here may: a threshold shifted to improve a published figure trades one number for another without the model getting any better.
 
@@ -142,28 +142,28 @@ This model is not deterministic. Run the same cross-validation again, on the sam
 
 ## How much these numbers move between runs
 
-Both models retrain on every nightly run, and every run rewrites this page. So how much a figure moves when nothing has been changed can be read straight out of the repository's history rather than estimated from it. Below are the last 14 training runs, from 2026-09-20T14:37:22Z to 2026-09-27T00:11:56Z.
+Both models retrain on every nightly run, and every run rewrites this page. So how much a figure moves when nothing has been changed can be read straight out of the repository's history rather than estimated from it. Below are the last 14 training runs, from 2026-09-20T23:59:42Z to 2026-09-27T08:33:17Z.
 
 | Figure | Then | Now | Typical step between runs | Widest spread |
 |---|---|---|---|---|
-| Award band coverage, whole window | 78.5 percent | 79.3 percent | 0.2 percent | 1.2 percent |
-| Coverage, history route | 78.0 percent | 78.5 percent | 0.3 percent | 1.0 percent |
-| Median error, history route | 38.4 percent | 37.8 percent | 0.1 percent | 0.8 percent |
-| Band width, history route | 5.09x | 5.05x | 0.02x | 0.16x |
-| Coverage, security route | 76.8 percent | 75.8 percent | 0.3 percent | 1.5 percent |
-| Median error, security route | 7.7 percent | 7.7 percent | 0.0 percent | 0.2 percent |
-| Award deferral | 14.4 percent | 12.0 percent | 0.3 percent | 2.7 percent |
+| Award band coverage, whole window | 78.1 percent | 79.2 percent | 0.2 percent | 1.2 percent |
+| Coverage, history route | 77.5 percent | 78.4 percent | 0.3 percent | 1.0 percent |
+| Median error, history route | 38.6 percent | 38.1 percent | 0.1 percent | 0.8 percent |
+| Band width, history route | 5.03x | 5.05x | 0.02x | 0.16x |
+| Coverage, security route | 76.7 percent | 75.8 percent | 0.3 percent | 1.5 percent |
+| Median error, security route | 7.8 percent | 7.7 percent | 0.0 percent | 0.2 percent |
+| Award deferral | 13.6 percent | 11.7 percent | 0.3 percent | 2.0 percent |
 | Category accuracy | 93.0 percent | 93.0 percent | 0.0 percent | 0.0 percent |
-| Category deferral | 15.6 percent | 13.0 percent | 0.2 percent | 2.6 percent |
-| Category macro F1 | 0.698 | 0.715 | 0.002 | 0.018 |
+| Category deferral | 15.5 percent | 13.4 percent | 0.2 percent | 2.5 percent |
+| Category macro F1 | 0.704 | 0.711 | 0.002 | 0.013 |
 
 This is the floor below which a change to either model cannot be told from the weather. The figures meant to hold still move by a few tenths of a point between runs and by up to 1.5 percent across the week, so a result smaller than that is not a result. Three sources are mixed together here and are not separated: each model's own randomness, the award model taking the category as a feature and so inheriting the classifier's refit, and the archive growing every night.
 
 Some figures are not meant to hold still, and against that floor their movement is real. It was earned by the detail crawl collecting more of what each model needs, not by any change to a model:
 
-- Award deferral: 14.4 percent to 12.0 percent, a move of 2.3 percent against a typical step of 0.3 percent.
-- Category deferral: 15.6 percent to 13.0 percent, a move of 2.6 percent against a typical step of 0.2 percent.
-- Category macro F1: 0.698 to 0.715, a move of 0.018 against a typical step of 0.002.
+- Award deferral: 13.6 percent to 11.7 percent, a move of 2.0 percent against a typical step of 0.3 percent.
+- Category deferral: 15.5 percent to 13.4 percent, a move of 2.1 percent against a typical step of 0.2 percent.
+- Category macro F1: 0.704 to 0.711, a move of 0.007 against a typical step of 0.002.
 
 Category accuracy sits flat at zero, and that is the design rather than a triumph: it is what the confidence bar is set to deliver, so it holds still by construction and the deferral beside it is the figure actually being measured. A target met exactly, every run, is a dial and not a result.
 

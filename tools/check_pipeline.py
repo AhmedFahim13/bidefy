@@ -110,10 +110,21 @@ def check_predictions(data_root: Path, checks: list) -> None:
         _fail(checks, True, "predictions: no estimate is beyond what the archive has ever awarded")
 
 
-def check_generated_docs(checks: list) -> None:
-    """The accuracy page is generated. If regenerating it changes anything, it was edited by hand."""
+def check_generated_docs(checks: list, data_root: Path | None = None) -> None:
+    """The accuracy page is generated. If regenerating it changes anything, it was edited by hand.
+
+    Only meaningful when the writer has the inputs the committed page was written from. One of its
+    lines counts the tenders open right now out of data/clean/tenders.parquet, which is derived and
+    gitignored, so on a fresh checkout the writer legitimately produces a different page. Comparing
+    anyway would fail every CI run for a reason that is not a defect, which is how a check teaches
+    people to ignore it. This was found by the check failing its own first CI run.
+    """
     page = ROOT / "docs" / "product" / "05-accuracy.md"
     if not page.exists():
+        return
+    if data_root is not None and not (data_root / "clean" / "tenders.parquet").exists():
+        _fail(checks, True, "the accuracy page was not compared: the clean tables it counts are "
+                            "derived and absent here, so the writer's inputs differ")
         return
     before = page.read_text(encoding="utf-8")
     run = subprocess.run([sys.executable, str(ROOT / "tools" / "write_accuracy_doc.py")],
@@ -139,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     check_promotions(Path(a.models_dir), checks)
     check_categories(Path(a.data_root), checks)
     check_predictions(Path(a.data_root), checks)
-    check_generated_docs(checks)
+    check_generated_docs(checks, Path(a.data_root))
 
     for ok, message in checks:
         print(f"{'ok  ' if ok else 'FAIL'} {message}")

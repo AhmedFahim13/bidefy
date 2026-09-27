@@ -25,9 +25,12 @@ jobs:
       - name: Tests
         # With coverage, so the floor in pyproject.toml is enforced rather than aspirational.
         run: uv run pytest --cov --cov-report=term-missing:skip-covered
-      - name: Generated files are generated
-        # The accuracy page promises it cannot drift from the model it describes. This is what makes
-        # that true rather than aspirational: if regenerating it changes a byte, it was hand-edited.
+      - name: Invariants that hold without crawled data
+        # The accuracy page promises it cannot drift from the model it describes, and this is what
+        # makes that true rather than aspirational. The page comparison needs the writer's own inputs
+        # though, and one of its lines counts live tenders out of the derived, gitignored clean
+        # tables, so here it reports that it could not compare rather than failing. The nightly run
+        # has those tables and does the real comparison; this job catches everything else.
         run: uv run python tools/check_pipeline.py
 
   worker:

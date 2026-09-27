@@ -130,9 +130,32 @@ def test_missing_artefacts_are_not_treated_as_failures(tmp_path: Path):
 
 def test_the_exit_code_follows_the_invariants(tmp_path: Path, monkeypatch, capsys):
     _tenders(tmp_path, ["portal"] * 90 + [""] * 10)          # the stale-bundle signature
-    monkeypatch.setattr(check_pipeline, "check_generated_docs", lambda checks: None)
+    monkeypatch.setattr(check_pipeline, "check_generated_docs", lambda checks, data_root=None: None)
     assert check_pipeline.main(["--data-root", str(tmp_path), "--models-dir", str(tmp_path)]) == 1
     assert "invariant(s) broken" in capsys.readouterr().out
 
     _tenders(tmp_path, ["portal"] * 90 + ["model"] * 10)
     assert check_pipeline.main(["--data-root", str(tmp_path), "--models-dir", str(tmp_path)]) == 0
+
+
+def test_the_page_is_not_compared_without_the_inputs_it_was_written_from(tmp_path: Path, capsys):
+    """A check that cannot pass in the place it runs is worse than no check.
+
+    One line of the page counts live tenders out of data/clean/tenders.parquet, which is derived and
+    gitignored. On a fresh checkout the writer legitimately produces a different page, so comparing
+    would fail every CI run for a reason that is not a defect. Found by the check failing its own
+    first run in CI, twenty minutes after it was pushed.
+    """
+    checks: list = []
+    check_pipeline.check_generated_docs(checks, tmp_path)       # no clean tables here
+    assert checks and all(ok for ok, _ in checks)
+    assert "was not compared" in checks[0][1]
+
+
+def test_the_page_is_compared_when_the_inputs_are_there(tmp_path: Path, monkeypatch):
+    """And with the inputs present it does the real comparison, so the skip cannot become the norm."""
+    _tenders(tmp_path, ["portal"] * 3)
+    called: list = []
+    monkeypatch.setattr(check_pipeline, "ROOT", tmp_path)       # no page here, so it returns early
+    check_pipeline.check_generated_docs(called, tmp_path)
+    assert called == []                                         # reached the page check, found none

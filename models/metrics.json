@@ -1,308 +1,308 @@
 {
   "category_classifier": {
     "accuracy_acted": 0.93,
-    "deferral_rate": 0.1251,
-    "coverage": 0.8749,
-    "accuracy_all": 0.8734,
-    "macro_f1": 0.7256,
-    "n_labels": 59686,
+    "deferral_rate": 0.1241,
+    "coverage": 0.8759,
+    "accuracy_all": 0.8735,
+    "macro_f1": 0.7249,
+    "n_labels": 61133,
     "n_classes": 13,
     "classes_dropped_for_sparsity": [],
-    "threshold": 0.699,
+    "threshold": 0.6965,
     "target_accuracy": 0.93,
     "evaluation": "cross-validated against the sector the portal's CPV codes identify, on tenders whose codes identify one, with buyer priors from the training fold only",
-    "n_tagged": 73673,
-    "truth_coverage": 0.8101,
+    "n_tagged": 75450,
+    "truth_coverage": 0.8102,
     "brief_dropout": 0.3,
     "min_train_margin": 1,
     "labeller": "cpv_sector",
     "use_nature": true,
     "repeats": 3,
-    "deferral_spread": 0.0009,
-    "macro_f1_spread": 0.0025,
+    "deferral_spread": 0.0022,
+    "macro_f1_spread": 0.0052,
     "scored_with_brief": true,
-    "trained_at": "2026-10-01T01:09:21Z",
-    "deferral_for_93": 0.1251,
-    "deferral_for_95": 0.1877,
-    "deferral_for_97": 0.2707,
-    "accuracy_acted_heldout_bar": 0.93,
-    "deferral_rate_heldout_bar": 0.125,
+    "trained_at": "2026-10-01T16:43:53Z",
+    "deferral_for_93": 0.1241,
+    "deferral_for_95": 0.1846,
+    "deferral_for_97": 0.2698,
+    "accuracy_acted_heldout_bar": 0.9299,
+    "deferral_rate_heldout_bar": 0.1239,
     "cost_optimal_points": [
       {
         "wrong_answer_costs": 1,
         "deferral": 0.0,
-        "accuracy": 0.8734
+        "accuracy": 0.8735
       },
       {
         "wrong_answer_costs": 2,
-        "deferral": 0.07,
-        "accuracy": 0.9081
+        "deferral": 0.0773,
+        "accuracy": 0.9119
       },
       {
         "wrong_answer_costs": 3,
-        "deferral": 0.1532,
-        "accuracy": 0.9396
+        "deferral": 0.159,
+        "accuracy": 0.9424
       },
       {
         "wrong_answer_costs": 5,
-        "deferral": 0.2504,
-        "accuracy": 0.966
+        "deferral": 0.2517,
+        "accuracy": 0.9667
       },
       {
         "wrong_answer_costs": 10,
-        "deferral": 0.3495,
-        "accuracy": 0.9824
+        "deferral": 0.3608,
+        "accuracy": 0.9842
       }
     ]
   },
   "award_value_model": {
-    "mape_acted": 0.249,
+    "mape_acted": 0.2474,
     "mape_naive_median": 0.7895,
-    "coverage_80": 0.7973,
-    "deferral_rate": 0.1045,
-    "band_width_median": 3.9,
+    "coverage_80": 0.7963,
+    "deferral_rate": 0.0958,
+    "band_width_median": 3.89,
     "band_width_p25": 1.4,
-    "band_width_p75": 6.1,
+    "band_width_p75": 6.05,
     "unconditional_spread": 50.5,
     "deferral_at_band_limit": {
-      "4": 0.5386,
-      "6": 0.332,
-      "8": 0.2023,
-      "12": 0.0918,
-      "20": 0.0302
+      "4": 0.5332,
+      "6": 0.3223,
+      "8": 0.1907,
+      "12": 0.0833,
+      "20": 0.0261
     },
-    "history_n": 116698,
-    "history_n_including_declined": 135140,
-    "history_mape": 0.3754,
-    "history_coverage_80": 0.7831,
-    "history_band_width_median": 4.93,
+    "history_n": 117382,
+    "history_n_including_declined": 134331,
+    "history_mape": 0.3755,
+    "history_coverage_80": 0.7812,
+    "history_band_width_median": 4.92,
     "history_mape_ci95": [
-      0.3729,
-      0.3783
+      0.3733,
+      0.3782
     ],
     "history_coverage_ci95": [
-      0.7807,
-      0.7857
+      0.7788,
+      0.7835
     ],
     "history_by_value": {
-      "coverage_per_tender": 0.7831,
-      "coverage_per_taka_estimated": 0.7686,
-      "coverage_per_taka_awarded": 0.6506,
-      "mean_error": 0.7222,
-      "mean_error_per_taka_awarded": 0.5248,
-      "share_of_escaped_taka_that_escaped_upward": 0.9159,
+      "coverage_per_tender": 0.7812,
+      "coverage_per_taka_estimated": 0.7602,
+      "coverage_per_taka_awarded": 0.6401,
+      "mean_error": 0.7255,
+      "mean_error_per_taka_awarded": 0.5299,
+      "share_of_escaped_taka_that_escaped_upward": 0.9124,
       "strata": [
         {
-          "estimate_from_lakh": 0.19,
-          "estimate_to_lakh": 3.65,
-          "awards": 23295,
-          "mape": 0.384,
-          "coverage_80": 0.7869,
-          "above_ceiling": 0.148,
-          "below_floor": 0.0651,
-          "band_width_median": 5.12,
-          "award_over_estimate_median": 1.16
+          "estimate_from_lakh": 0.26,
+          "estimate_to_lakh": 3.57,
+          "awards": 23392,
+          "mape": 0.3864,
+          "coverage_80": 0.7861,
+          "above_ceiling": 0.1459,
+          "below_floor": 0.068,
+          "band_width_median": 5.05,
+          "award_over_estimate_median": 1.17
         },
         {
-          "estimate_from_lakh": 3.66,
-          "estimate_to_lakh": 6.77,
-          "awards": 23332,
-          "mape": 0.3882,
-          "coverage_80": 0.7955,
-          "above_ceiling": 0.1287,
-          "below_floor": 0.0758,
-          "band_width_median": 5.03,
-          "award_over_estimate_median": 1.06
+          "estimate_from_lakh": 3.58,
+          "estimate_to_lakh": 6.73,
+          "awards": 23548,
+          "mape": 0.3863,
+          "coverage_80": 0.7936,
+          "above_ceiling": 0.1314,
+          "below_floor": 0.075,
+          "band_width_median": 5.05,
+          "award_over_estimate_median": 1.07
         },
         {
-          "estimate_from_lakh": 6.78,
-          "estimate_to_lakh": 11.72,
-          "awards": 23359,
-          "mape": 0.35,
-          "coverage_80": 0.7915,
-          "above_ceiling": 0.1197,
-          "below_floor": 0.0888,
-          "band_width_median": 4.56,
+          "estimate_from_lakh": 6.74,
+          "estimate_to_lakh": 11.71,
+          "awards": 23454,
+          "mape": 0.3488,
+          "coverage_80": 0.7924,
+          "above_ceiling": 0.1206,
+          "below_floor": 0.0869,
+          "band_width_median": 4.58,
           "award_over_estimate_median": 1.01
         },
         {
-          "estimate_from_lakh": 11.73,
-          "estimate_to_lakh": 29.01,
-          "awards": 23371,
-          "mape": 0.3636,
-          "coverage_80": 0.7684,
-          "above_ceiling": 0.0952,
-          "below_floor": 0.1364,
-          "band_width_median": 4.59,
+          "estimate_from_lakh": 11.72,
+          "estimate_to_lakh": 28.76,
+          "awards": 23511,
+          "mape": 0.3642,
+          "coverage_80": 0.7656,
+          "above_ceiling": 0.0961,
+          "below_floor": 0.1383,
+          "band_width_median": 4.61,
           "award_over_estimate_median": 0.91
         },
         {
-          "estimate_from_lakh": 29.02,
-          "estimate_to_lakh": 3193.15,
-          "awards": 23341,
-          "mape": 0.3896,
-          "coverage_80": 0.7731,
-          "above_ceiling": 0.0997,
-          "below_floor": 0.1271,
-          "band_width_median": 5.27,
-          "award_over_estimate_median": 0.97
+          "estimate_from_lakh": 28.77,
+          "estimate_to_lakh": 3372.08,
+          "awards": 23477,
+          "mape": 0.3883,
+          "coverage_80": 0.7682,
+          "above_ceiling": 0.1007,
+          "below_floor": 0.131,
+          "band_width_median": 5.26,
+          "award_over_estimate_median": 0.98
         }
       ]
     },
     "history_by_method": {
       "LTM": {
-        "n_acted": 74041,
-        "mape": 0.3335,
-        "coverage_80": 0.7995,
-        "band_width_median": 4.31,
-        "deferral_rate": 0.0387
+        "n_acted": 74078,
+        "mape": 0.3333,
+        "coverage_80": 0.8022,
+        "band_width_median": 4.35,
+        "deferral_rate": 0.0399
       },
       "OTM": {
-        "n_acted": 27150,
-        "mape": 0.4638,
-        "coverage_80": 0.758,
-        "band_width_median": 6.55,
-        "deferral_rate": 0.2809
+        "n_acted": 27326,
+        "mape": 0.4667,
+        "coverage_80": 0.7448,
+        "band_width_median": 6.37,
+        "deferral_rate": 0.2565
       },
       "RFQU": {
-        "n_acted": 7411,
-        "mape": 0.455,
-        "coverage_80": 0.7469,
-        "band_width_median": 6.11,
-        "deferral_rate": 0.2252
+        "n_acted": 7777,
+        "mape": 0.4556,
+        "coverage_80": 0.7431,
+        "band_width_median": 5.95,
+        "deferral_rate": 0.1883
       },
       "RFQ": {
-        "n_acted": 6783,
-        "mape": 0.4283,
-        "coverage_80": 0.7538,
-        "band_width_median": 5.36,
-        "deferral_rate": 0.2065
+        "n_acted": 6878,
+        "mape": 0.431,
+        "coverage_80": 0.7521,
+        "band_width_median": 5.35,
+        "deferral_rate": 0.1991
       },
       "RFQL": {
-        "n_acted": 711,
-        "mape": 0.43,
-        "coverage_80": 0.8143,
-        "band_width_median": 6.45,
-        "deferral_rate": 0.2578
+        "n_acted": 713,
+        "mape": 0.4556,
+        "coverage_80": 0.8008,
+        "band_width_median": 6.7,
+        "deferral_rate": 0.2588
       },
       "DPM": {
-        "n_acted": 438,
-        "mape": 0.5898,
-        "coverage_80": 0.7123,
-        "band_width_median": 8.52,
-        "deferral_rate": 0.3282
+        "n_acted": 443,
+        "mape": 0.6443,
+        "coverage_80": 0.7427,
+        "band_width_median": 8.0,
+        "deferral_rate": 0.3247
       }
     },
     "projection_method_mix": {
       "OTM": 0.9554,
-      "IC": 0.0407,
-      "OSTETM": 0.0038
+      "OSTETM": 0.0038,
+      "IC": 0.0408
     },
-    "live_security_share": 0.835619824496354,
-    "expected_mape_on_open_tenders": 0.0725,
-    "expected_coverage_on_open_tenders": 0.8204,
+    "live_security_share": 0.8357434186132741,
+    "expected_mape_on_open_tenders": 0.0712,
+    "expected_coverage_on_open_tenders": 0.8206,
     "expected_band_width_on_open_tenders": 1.4,
-    "security_route_n_total": 41302,
-    "security_rows_implausible": 103,
-    "security_n": 8382,
-    "security_fitted_on": 24570,
-    "security_calibrated_on": 8350,
+    "security_route_n_total": 42493,
+    "security_rows_implausible": 114,
+    "security_n": 8705,
+    "security_fitted_on": 25251,
+    "security_calibrated_on": 8537,
     "security_test_from": "2026-06-18",
-    "security_mape": 0.0749,
-    "security_coverage_80": 0.754,
-    "security_band_width_median": 1.35,
+    "security_mape": 0.0754,
+    "security_coverage_80": 0.7535,
+    "security_band_width_median": 1.34,
     "security_by_value": {
-      "coverage_per_tender": 0.754,
-      "coverage_per_taka_estimated": 0.7016,
-      "coverage_per_taka_awarded": 0.6638,
-      "mean_error": 0.1149,
-      "mean_error_per_taka_awarded": 0.1364,
-      "share_of_escaped_taka_that_escaped_upward": 0.7658,
+      "coverage_per_tender": 0.7535,
+      "coverage_per_taka_estimated": 0.7052,
+      "coverage_per_taka_awarded": 0.6662,
+      "mean_error": 0.1153,
+      "mean_error_per_taka_awarded": 0.1368,
+      "share_of_escaped_taka_that_escaped_upward": 0.7758,
       "strata": [
         {
           "estimate_from_lakh": 0.07,
-          "estimate_to_lakh": 5.29,
-          "awards": 1677,
-          "mape": 0.0789,
-          "coverage_80": 0.743,
-          "above_ceiling": 0.1377,
-          "below_floor": 0.1193,
-          "band_width_median": 1.35,
+          "estimate_to_lakh": 5.27,
+          "awards": 1740,
+          "mape": 0.079,
+          "coverage_80": 0.7425,
+          "above_ceiling": 0.1356,
+          "below_floor": 0.1218,
+          "band_width_median": 1.34,
           "award_over_estimate_median": 1.03
         },
         {
-          "estimate_from_lakh": 5.3,
-          "estimate_to_lakh": 13.17,
-          "awards": 1676,
-          "mape": 0.0709,
-          "coverage_80": 0.7822,
-          "above_ceiling": 0.1098,
-          "below_floor": 0.108,
-          "band_width_median": 1.35,
+          "estimate_from_lakh": 5.28,
+          "estimate_to_lakh": 13.12,
+          "awards": 1739,
+          "mape": 0.0706,
+          "coverage_80": 0.7792,
+          "above_ceiling": 0.1139,
+          "below_floor": 0.107,
+          "band_width_median": 1.34,
           "award_over_estimate_median": 1.01
         },
         {
-          "estimate_from_lakh": 13.19,
-          "estimate_to_lakh": 34.38,
-          "awards": 1676,
-          "mape": 0.0691,
-          "coverage_80": 0.7822,
-          "above_ceiling": 0.1152,
-          "below_floor": 0.1026,
-          "band_width_median": 1.35,
+          "estimate_from_lakh": 13.12,
+          "estimate_to_lakh": 34.0,
+          "awards": 1744,
+          "mape": 0.0694,
+          "coverage_80": 0.781,
+          "above_ceiling": 0.1175,
+          "below_floor": 0.1015,
+          "band_width_median": 1.34,
           "award_over_estimate_median": 1.01
         },
         {
-          "estimate_from_lakh": 34.46,
-          "estimate_to_lakh": 143.13,
-          "awards": 1676,
-          "mape": 0.0838,
-          "coverage_80": 0.7255,
-          "above_ceiling": 0.1671,
-          "below_floor": 0.1074,
-          "band_width_median": 1.35,
+          "estimate_from_lakh": 34.08,
+          "estimate_to_lakh": 142.54,
+          "awards": 1741,
+          "mape": 0.0835,
+          "coverage_80": 0.7266,
+          "above_ceiling": 0.1694,
+          "below_floor": 0.104,
+          "band_width_median": 1.34,
           "award_over_estimate_median": 1.04
         },
         {
-          "estimate_from_lakh": 143.82,
+          "estimate_from_lakh": 142.55,
           "estimate_to_lakh": 17500.0,
-          "awards": 1677,
-          "mape": 0.0728,
-          "coverage_80": 0.737,
-          "above_ceiling": 0.1342,
-          "below_floor": 0.1288,
-          "band_width_median": 1.35,
-          "award_over_estimate_median": 1.03
+          "awards": 1741,
+          "mape": 0.0729,
+          "coverage_80": 0.7381,
+          "above_ceiling": 0.135,
+          "below_floor": 0.1269,
+          "band_width_median": 1.34,
+          "award_over_estimate_median": 1.02
         }
       ]
     },
     "security_coverage_by_band_age": {
       "within a week": {
-        "awards": 1042,
-        "coverage_80": 0.8177
+        "awards": 1076,
+        "coverage_80": 0.8151
       },
       "one to three weeks": {
-        "awards": 1397,
-        "coverage_80": 0.7724
+        "awards": 1427,
+        "coverage_80": 0.7744
       },
       "three to six weeks": {
-        "awards": 1839,
-        "coverage_80": 0.758
+        "awards": 1889,
+        "coverage_80": 0.7591
       },
       "over six weeks": {
-        "awards": 4104,
-        "coverage_80": 0.7298
+        "awards": 4313,
+        "coverage_80": 0.7287
       }
     },
-    "security_coverage_fresh_band": 0.8177,
-    "security_n_fresh_band": 1042,
+    "security_coverage_fresh_band": 0.8151,
+    "security_n_fresh_band": 1076,
     "drift_allowance": 0.04,
     "n_fit": 704583,
     "n_calibration": 422750,
-    "n_test": 176544,
+    "n_test": 176935,
     "test_from": "2025-03-27",
     "train_last_signed": "2025-03-26",
-    "trained_at": "2026-10-01T01:35:00Z",
+    "trained_at": "2026-10-01T17:03:08Z",
     "model_version": "award-20261001"
   }
 }

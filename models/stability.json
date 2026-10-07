@@ -8,14 +8,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.797,
-      "last": 0.8035,
+      "first": 0.7939,
+      "last": 0.8037,
       "min": 0.7939,
-      "max": 0.8035,
-      "spread": 0.0096,
-      "typical_step": 0.0018,
+      "max": 0.8037,
+      "spread": 0.0098,
+      "typical_step": 0.001,
       "largest_step": 0.0038,
-      "net_change": 0.0065
+      "net_change": 0.0098
     },
     "award_value_model.history_coverage_80": {
       "label": "Coverage, history route",
@@ -23,14 +23,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7866,
-      "last": 0.7879,
+      "first": 0.782,
+      "last": 0.7877,
       "min": 0.7812,
       "max": 0.7879,
       "spread": 0.0067,
-      "typical_step": 0.0019,
+      "typical_step": 0.0013,
       "largest_step": 0.0051,
-      "net_change": 0.0013
+      "net_change": 0.0057
     },
     "award_value_model.history_mape": {
       "label": "Median error, history route",
@@ -38,14 +38,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.3768,
-      "last": 0.372,
-      "min": 0.3719,
+      "first": 0.3774,
+      "last": 0.3717,
+      "min": 0.3717,
       "max": 0.3778,
-      "spread": 0.0059,
+      "spread": 0.0061,
       "typical_step": 0.0013,
       "largest_step": 0.0031,
-      "net_change": -0.0048
+      "net_change": -0.0057
     },
     "award_value_model.history_band_width_median": {
       "label": "Band width, history route",
@@ -53,14 +53,14 @@
       "kind": "multiple",
       "better": "down",
       "runs": 14,
-      "first": 5.05,
-      "last": 4.95,
+      "first": 4.98,
+      "last": 4.93,
       "min": 4.89,
-      "max": 5.05,
-      "spread": 0.16,
+      "max": 5.0,
+      "spread": 0.11,
       "typical_step": 0.02,
       "largest_step": 0.09,
-      "net_change": -0.1
+      "net_change": -0.05
     },
     "award_value_model.security_coverage_80": {
       "label": "Coverage, security route",
@@ -68,14 +68,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7507,
-      "last": 0.7448,
-      "min": 0.7448,
+      "first": 0.7532,
+      "last": 0.7402,
+      "min": 0.7402,
       "max": 0.7543,
-      "spread": 0.0095,
+      "spread": 0.0141,
       "typical_step": 0.0006,
-      "largest_step": 0.0039,
-      "net_change": -0.0059
+      "largest_step": 0.0046,
+      "net_change": -0.013
     },
     "award_value_model.security_mape": {
       "label": "Median error, security route",
@@ -83,14 +83,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.0766,
-      "last": 0.0742,
+      "first": 0.076,
+      "last": 0.0744,
       "min": 0.0741,
-      "max": 0.0766,
-      "spread": 0.0025,
-      "typical_step": 0.0003,
+      "max": 0.076,
+      "spread": 0.0019,
+      "typical_step": 0.0002,
       "largest_step": 0.0011,
-      "net_change": -0.0024
+      "net_change": -0.0016
     },
     "award_value_model.deferral_rate": {
       "label": "Award deferral",
@@ -98,14 +98,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.1147,
-      "last": 0.0897,
+      "first": 0.1091,
+      "last": 0.0894,
       "min": 0.0849,
-      "max": 0.1147,
-      "spread": 0.0298,
-      "typical_step": 0.0045,
+      "max": 0.1091,
+      "spread": 0.0242,
+      "typical_step": 0.0035,
       "largest_step": 0.0088,
-      "net_change": -0.025
+      "net_change": -0.0197
     },
     "category_classifier.accuracy_acted": {
       "label": "Category accuracy",
@@ -128,14 +128,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.1281,
-      "last": 0.12,
+      "first": 0.1255,
+      "last": 0.121,
       "min": 0.12,
-      "max": 0.1281,
-      "spread": 0.0081,
+      "max": 0.1259,
+      "spread": 0.0059,
       "typical_step": 0.0009,
       "largest_step": 0.0029,
-      "net_change": -0.0081
+      "net_change": -0.0045
     },
     "category_classifier.macro_f1": {
       "label": "Category macro F1",
@@ -143,16 +143,16 @@
       "kind": "score",
       "better": "up",
       "runs": 14,
-      "first": 0.7204,
-      "last": 0.7298,
-      "min": 0.7204,
+      "first": 0.7229,
+      "last": 0.7296,
+      "min": 0.7224,
       "max": 0.7298,
-      "spread": 0.0094,
+      "spread": 0.0074,
       "typical_step": 0.0008,
       "largest_step": 0.003,
-      "net_change": 0.0094
+      "net_change": 0.0067
     }
   },
-  "from": "2026-09-28T18:31:36Z",
-  "to": "2026-10-05T18:19:49Z"
+  "from": "2026-09-29T02:05:16Z",
+  "to": "2026-10-06T16:08:21Z"
 }

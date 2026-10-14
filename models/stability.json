@@ -8,14 +8,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.8035,
-      "last": 0.7971,
+      "first": 0.8037,
+      "last": 0.7977,
       "min": 0.7927,
       "max": 0.8059,
       "spread": 0.0132,
       "typical_step": 0.0027,
       "largest_step": 0.0067,
-      "net_change": -0.0064
+      "net_change": -0.006
     },
     "award_value_model.history_coverage_80": {
       "label": "Coverage, history route",
@@ -23,14 +23,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7879,
-      "last": 0.7817,
+      "first": 0.7877,
+      "last": 0.7827,
       "min": 0.7757,
       "max": 0.7907,
       "spread": 0.015,
       "typical_step": 0.0038,
       "largest_step": 0.0093,
-      "net_change": -0.0062
+      "net_change": -0.005
     },
     "award_value_model.history_mape": {
       "label": "Median error, history route",
@@ -38,14 +38,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.372,
-      "last": 0.3741,
+      "first": 0.3717,
+      "last": 0.375,
       "min": 0.3717,
       "max": 0.3763,
       "spread": 0.0046,
       "typical_step": 0.0013,
       "largest_step": 0.0018,
-      "net_change": 0.0021
+      "net_change": 0.0033
     },
     "award_value_model.history_band_width_median": {
       "label": "Band width, history route",
@@ -53,8 +53,8 @@
       "kind": "multiple",
       "better": "down",
       "runs": 14,
-      "first": 4.95,
-      "last": 4.89,
+      "first": 4.93,
+      "last": 4.87,
       "min": 4.79,
       "max": 5.0,
       "spread": 0.21,
@@ -68,14 +68,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7448,
+      "first": 0.7402,
       "last": 0.7432,
       "min": 0.7402,
       "max": 0.7453,
       "spread": 0.0051,
-      "typical_step": 0.0001,
-      "largest_step": 0.0046,
-      "net_change": -0.0016
+      "typical_step": 0.0,
+      "largest_step": 0.0044,
+      "net_change": 0.003
     },
     "award_value_model.security_mape": {
       "label": "Median error, security route",
@@ -83,14 +83,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.0742,
+      "first": 0.0744,
       "last": 0.076,
-      "min": 0.0742,
+      "min": 0.0743,
       "max": 0.0762,
-      "spread": 0.002,
+      "spread": 0.0019,
       "typical_step": 0.0,
       "largest_step": 0.0014,
-      "net_change": 0.0018
+      "net_change": 0.0016
     },
     "award_value_model.deferral_rate": {
       "label": "Award deferral",
@@ -98,14 +98,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.0897,
-      "last": 0.0873,
+      "first": 0.0894,
+      "last": 0.0867,
       "min": 0.0833,
       "max": 0.0916,
       "spread": 0.0083,
       "typical_step": 0.0018,
       "largest_step": 0.0055,
-      "net_change": -0.0024
+      "net_change": -0.0027
     },
     "category_classifier.accuracy_acted": {
       "label": "Category accuracy",
@@ -128,14 +128,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.12,
-      "last": 0.12,
-      "min": 0.1199,
+      "first": 0.121,
+      "last": 0.1198,
+      "min": 0.1198,
       "max": 0.1214,
-      "spread": 0.0015,
+      "spread": 0.0016,
       "typical_step": 0.0005,
-      "largest_step": 0.001,
-      "net_change": 0.0
+      "largest_step": 0.0009,
+      "net_change": -0.0012
     },
     "category_classifier.macro_f1": {
       "label": "Category macro F1",
@@ -143,16 +143,16 @@
       "kind": "score",
       "better": "up",
       "runs": 14,
-      "first": 0.7298,
-      "last": 0.7312,
+      "first": 0.7296,
+      "last": 0.7302,
       "min": 0.7269,
       "max": 0.7318,
       "spread": 0.0049,
       "typical_step": 0.0015,
       "largest_step": 0.003,
-      "net_change": 0.0014
+      "net_change": 0.0006
     }
   },
-  "from": "2026-10-05T18:19:49Z",
-  "to": "2026-10-13T16:47:40Z"
+  "from": "2026-10-06T16:08:21Z",
+  "to": "2026-10-14T00:50:25Z"
 }

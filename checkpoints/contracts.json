@@ -1,12 +1,12 @@
 {
   "endpoint": "contracts",
   "next_page": 4394,
-  "total_pages": 4448,
-  "newest_id_seen": "1353546",
+  "total_pages": 4452,
+  "newest_id_seen": "1357320",
   "mode": "delta",
-  "updated_at": "2026-10-18T12:33:30Z",
-  "last_run_pages": 20,
-  "last_run_rows": 533,
+  "updated_at": "2026-10-19T15:26:55Z",
+  "last_run_pages": 23,
+  "last_run_rows": 741,
   "last_run_status": "done",
   "backfill_completed": true
 }

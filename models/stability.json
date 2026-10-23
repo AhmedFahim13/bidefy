@@ -8,14 +8,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7983,
-      "last": 0.7979,
+      "first": 0.7986,
+      "last": 0.8007,
       "min": 0.7971,
       "max": 0.8007,
       "spread": 0.0036,
-      "typical_step": 0.001,
+      "typical_step": 0.0012,
       "largest_step": 0.003,
-      "net_change": -0.0004
+      "net_change": 0.0021
     },
     "award_value_model.history_coverage_80": {
       "label": "Coverage, history route",
@@ -23,14 +23,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7827,
-      "last": 0.7825,
+      "first": 0.7831,
+      "last": 0.7858,
       "min": 0.7809,
       "max": 0.7874,
       "spread": 0.0065,
-      "typical_step": 0.0015,
+      "typical_step": 0.0019,
       "largest_step": 0.0046,
-      "net_change": -0.0002
+      "net_change": 0.0027
     },
     "award_value_model.history_mape": {
       "label": "Median error, history route",
@@ -38,14 +38,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.3746,
-      "last": 0.3746,
-      "min": 0.3732,
+      "first": 0.3739,
+      "last": 0.3718,
+      "min": 0.3718,
       "max": 0.375,
-      "spread": 0.0018,
+      "spread": 0.0032,
       "typical_step": 0.0007,
-      "largest_step": 0.0018,
-      "net_change": 0.0
+      "largest_step": 0.0028,
+      "net_change": -0.0021
     },
     "award_value_model.history_band_width_median": {
       "label": "Band width, history route",
@@ -54,13 +54,13 @@
       "better": "down",
       "runs": 14,
       "first": 4.9,
-      "last": 4.96,
+      "last": 4.93,
       "min": 4.87,
       "max": 4.99,
       "spread": 0.12,
       "typical_step": 0.03,
       "largest_step": 0.08,
-      "net_change": 0.06
+      "net_change": 0.03
     },
     "award_value_model.security_coverage_80": {
       "label": "Coverage, security route",
@@ -68,14 +68,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7393,
+      "first": 0.7396,
       "last": 0.7446,
-      "min": 0.7393,
+      "min": 0.7396,
       "max": 0.7454,
-      "spread": 0.0061,
+      "spread": 0.0058,
       "typical_step": 0.0,
       "largest_step": 0.0021,
-      "net_change": 0.0053
+      "net_change": 0.005
     },
     "award_value_model.security_mape": {
       "label": "Median error, security route",
@@ -98,14 +98,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.0865,
-      "last": 0.0839,
+      "first": 0.0884,
+      "last": 0.1131,
       "min": 0.0839,
-      "max": 0.0915,
-      "spread": 0.0076,
+      "max": 0.1131,
+      "spread": 0.0292,
       "typical_step": 0.0017,
-      "largest_step": 0.0076,
-      "net_change": -0.0026
+      "largest_step": 0.0292,
+      "net_change": 0.0247
     },
     "category_classifier.accuracy_acted": {
       "label": "Category accuracy",
@@ -128,14 +128,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.1188,
+      "first": 0.1187,
       "last": 0.1186,
       "min": 0.1178,
       "max": 0.1191,
       "spread": 0.0013,
       "typical_step": 0.0004,
       "largest_step": 0.001,
-      "net_change": -0.0002
+      "net_change": -0.0001
     },
     "category_classifier.macro_f1": {
       "label": "Category macro F1",
@@ -143,16 +143,16 @@
       "kind": "score",
       "better": "up",
       "runs": 14,
-      "first": 0.731,
+      "first": 0.732,
       "last": 0.7326,
       "min": 0.73,
       "max": 0.7332,
       "spread": 0.0032,
-      "typical_step": 0.0009,
+      "typical_step": 0.0008,
       "largest_step": 0.0024,
-      "net_change": 0.0016
+      "net_change": 0.0006
     }
   },
-  "from": "2026-10-15T23:40:06Z",
-  "to": "2026-10-22T14:41:14Z"
+  "from": "2026-10-16T13:58:53Z",
+  "to": "2026-10-22T23:33:14Z"
 }

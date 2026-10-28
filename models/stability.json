@@ -8,14 +8,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.8,
-      "last": 0.7973,
+      "first": 0.7988,
+      "last": 0.7988,
       "min": 0.7973,
       "max": 0.8007,
       "spread": 0.0034,
       "typical_step": 0.0007,
       "largest_step": 0.0028,
-      "net_change": -0.0027
+      "net_change": 0.0
     },
     "award_value_model.history_coverage_80": {
       "label": "Coverage, history route",
@@ -23,14 +23,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.786,
-      "last": 0.7817,
+      "first": 0.7841,
+      "last": 0.7838,
       "min": 0.7814,
       "max": 0.7863,
       "spread": 0.0049,
       "typical_step": 0.0011,
       "largest_step": 0.0033,
-      "net_change": -0.0043
+      "net_change": -0.0003
     },
     "award_value_model.history_mape": {
       "label": "Median error, history route",
@@ -38,14 +38,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.3733,
-      "last": 0.375,
+      "first": 0.375,
+      "last": 0.3747,
       "min": 0.3705,
       "max": 0.375,
       "spread": 0.0045,
-      "typical_step": 0.0009,
+      "typical_step": 0.0007,
       "largest_step": 0.0037,
-      "net_change": 0.0017
+      "net_change": -0.0003
     },
     "award_value_model.history_band_width_median": {
       "label": "Band width, history route",
@@ -53,14 +53,14 @@
       "kind": "multiple",
       "better": "down",
       "runs": 14,
-      "first": 4.99,
-      "last": 4.89,
+      "first": 4.93,
+      "last": 4.93,
       "min": 4.84,
       "max": 4.99,
       "spread": 0.15,
-      "typical_step": 0.06,
+      "typical_step": 0.04,
       "largest_step": 0.12,
-      "net_change": -0.1
+      "net_change": 0.0
     },
     "award_value_model.security_coverage_80": {
       "label": "Coverage, security route",
@@ -68,14 +68,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7453,
+      "first": 0.7454,
       "last": 0.7465,
       "min": 0.7421,
       "max": 0.7465,
       "spread": 0.0044,
       "typical_step": 0.0,
       "largest_step": 0.0044,
-      "net_change": 0.0012
+      "net_change": 0.0011
     },
     "award_value_model.security_mape": {
       "label": "Median error, security route",
@@ -83,14 +83,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.0762,
+      "first": 0.0761,
       "last": 0.076,
       "min": 0.0759,
       "max": 0.0764,
       "spread": 0.0005,
       "typical_step": 0.0,
       "largest_step": 0.0004,
-      "net_change": -0.0002
+      "net_change": -0.0001
     },
     "award_value_model.deferral_rate": {
       "label": "Award deferral",
@@ -98,14 +98,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.088,
-      "last": 0.0856,
+      "first": 0.0874,
+      "last": 0.0915,
       "min": 0.0827,
       "max": 0.1147,
       "spread": 0.032,
       "typical_step": 0.0076,
       "largest_step": 0.0292,
-      "net_change": -0.0024
+      "net_change": 0.0041
     },
     "category_classifier.accuracy_acted": {
       "label": "Category accuracy",
@@ -128,14 +128,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.1184,
-      "last": 0.1188,
+      "first": 0.1181,
+      "last": 0.1183,
       "min": 0.1174,
       "max": 0.1191,
       "spread": 0.0017,
-      "typical_step": 0.0003,
+      "typical_step": 0.0004,
       "largest_step": 0.001,
-      "net_change": 0.0004
+      "net_change": 0.0002
     },
     "category_classifier.macro_f1": {
       "label": "Category macro F1",
@@ -143,16 +143,16 @@
       "kind": "score",
       "better": "up",
       "runs": 14,
-      "first": 0.73,
-      "last": 0.7337,
-      "min": 0.73,
+      "first": 0.7316,
+      "last": 0.7319,
+      "min": 0.7301,
       "max": 0.7337,
-      "spread": 0.0037,
+      "spread": 0.0036,
       "typical_step": 0.0005,
       "largest_step": 0.0027,
-      "net_change": 0.0037
+      "net_change": 0.0003
     }
   },
-  "from": "2026-10-20T00:15:24Z",
-  "to": "2026-10-27T15:26:45Z"
+  "from": "2026-10-20T14:37:30Z",
+  "to": "2026-10-28T00:38:21Z"
 }

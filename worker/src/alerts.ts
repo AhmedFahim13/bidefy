@@ -132,6 +132,15 @@ async function matchAndSend(env: AlertEnv, opts: { dry: boolean; siteBase: strin
     }
     return { candidates: 0, subscriptions: 0, matched: 0, sent: 0, failed: 0, pruned: 0, dry: false, watermark: newest?.v ?? "" };
   }
+  // New tenders only reach D1 with a load, so an hour with no new load has nothing to examine.
+  // Reading every live tender to learn that cost 15.7k rows an hour against D1's daily read cap.
+  const marks = await env.DB.prepare("SELECT key, value FROM meta WHERE key IN ('d1_last_load', 'alerts_matched_load')")
+    .all<{ key: string; value: string }>();
+  const mark = (k: string) => marks.results?.find((r) => r.key === k)?.value;
+  const load = mark("d1_last_load") ?? "";
+  if (!opts.dry && loadAlreadyMatched(load, mark("alerts_matched_load"))) {
+    return { candidates: 0, subscriptions: 0, matched: 0, sent: 0, failed: 0, pruned: 0, dry: false, watermark };
+  }
   const { results: tenders } = await env.DB.prepare(
     "SELECT tender_id, title, ministry, status, category, procuring_entity, closing_at, fetched_at FROM tenders " +
       "WHERE fetched_at > ? AND status = 'Live' ORDER BY fetched_at ASC LIMIT ?",
@@ -142,6 +151,7 @@ async function matchAndSend(env: AlertEnv, opts: { dry: boolean; siteBase: strin
   const result: RunResult = { candidates: tenders?.length ?? 0, subscriptions: subs?.length ?? 0, matched: 0, sent: 0, failed: 0, pruned: 0, dry: opts.dry, watermark };
   if (!tenders?.length || !subs?.length) {
     if (tenders?.length && !opts.dry) await advance(env, tenders);
+    if (!opts.dry) await markMatched(env, load, tenders?.length ?? 0);
     return result;
   }
   const vapid: VapidKeys = { subject: env.VAPID_SUBJECT, publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY };
@@ -184,8 +194,22 @@ async function matchAndSend(env: AlertEnv, opts: { dry: boolean; siteBase: strin
       }
     }
   }
-  if (!opts.dry) await advance(env, tenders);
+  if (!opts.dry) {
+    await advance(env, tenders);
+    await markMatched(env, load, tenders.length);
+  }
   return result;
+}
+
+/** True when this load's tenders were already all examined by an earlier run. */
+export function loadAlreadyMatched(load: string, matched: string | undefined): boolean {
+  return !!load && load === matched;
+}
+
+async function markMatched(env: AlertEnv, load: string, examined: number): Promise<void> {
+  // a full batch may have more behind it, so only a short one closes the load
+  if (!load || examined >= MAX_CANDIDATES) return;
+  await env.DB.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('alerts_matched_load', ?)").bind(load).run();
 }
 
 async function advance(env: AlertEnv, tenders: TenderLite[]): Promise<void> {

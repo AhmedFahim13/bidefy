@@ -5,6 +5,7 @@ import { newSubscriptionId, validateSubscription } from "./subscriptions";
 import { runAlerts } from "./alerts";
 import { hashIp, validateAccessRequest } from "./access";
 import { USAGE_SQL, usageParams, usageSummary } from "./usage";
+import { cachedSummary, defaultFiltersKey } from "./cache";
 
 type Bindings = {
   DB: D1Database;
@@ -21,26 +22,37 @@ app.use("/api/*", cors({ origin: "*", allowMethods: ["GET", "POST", "DELETE", "O
 app.get("/", (c) => c.json({ name: "Bidefy API", docs: "/api/v1/health" }));
 
 app.get("/api/v1/health", async (c) => {
-  const counts = await c.env.DB.batch([
-    c.env.DB.prepare("SELECT COUNT(*) AS n FROM tenders"),
-    c.env.DB.prepare("SELECT COUNT(*) AS n FROM contracts"),
-    c.env.DB.prepare("SELECT COUNT(*) AS n FROM bidders"),
-    c.env.DB.prepare("SELECT MAX(published_at) AS newest FROM tenders"),
-  ]);
-  const row = (i: number) => (counts[i].results?.[0] as Record<string, unknown> | undefined) ?? {};
-  return c.json({
-    ok: true,
-    tenders: row(0).n ?? 0,
-    contracts: row(1).n ?? 0,
-    bidders: row(2).n ?? 0,
-    newest_tender: row(3).newest ?? null,
+  const db = c.env.DB;
+  const body = await cachedSummary(db, "summary:health", async () => {
+    const counts = await db.batch([
+      db.prepare("SELECT COUNT(*) AS n FROM tenders"),
+      db.prepare("SELECT COUNT(*) AS n FROM contracts"),
+      db.prepare("SELECT COUNT(*) AS n FROM bidders"),
+      db.prepare("SELECT MAX(published_at) AS newest FROM tenders"),
+    ]);
+    const row = (i: number) => (counts[i].results?.[0] as Record<string, unknown> | undefined) ?? {};
+    return {
+      ok: true,
+      tenders: row(0).n ?? 0,
+      contracts: row(1).n ?? 0,
+      bidders: row(2).n ?? 0,
+      newest_tender: row(3).newest ?? null,
+    };
   });
+  return c.json(body);
 });
 
 app.get("/api/v1/tenders", async (c) => {
   const f = parseTenderFilters(new URL(c.req.url).searchParams);
   const q = tenderListQuery(f);
-  const { results } = await c.env.DB.prepare(q.sql).bind(...q.params).all();
+  let results: unknown[] | undefined;
+  try {
+    ({ results } = await c.env.DB.prepare(q.sql).bind(...q.params).all());
+  } catch (e) {
+    // a database built without the date index must still list tenders, only less cheaply
+    if (!String(e).includes("no such index")) throw e;
+    ({ results } = await c.env.DB.prepare(q.sql.replace(" INDEXED BY idx_tenders_published", "")).bind(...q.params).all());
+  }
   return c.json({ page: f.page, size: f.size, items: results ?? [] });
 });
 
@@ -81,39 +93,48 @@ app.get("/api/v1/filters", async (c) => {
   // Counts follow whatever is already chosen, so the dropdowns describe the tenders in front of
   // the reader rather than the whole archive.
   const f = parseTenderFilters(new URL(c.req.url).searchParams);
-  const ministryQ = facetQuery(f, "ministry", 60);
-  const statusQ = facetQuery(f, "status");
-  const categoryQ = facetQuery(f, "category");
-  const [ministries, districts, statuses, categories] = await c.env.DB.batch([
-    c.env.DB.prepare(ministryQ.sql).bind(...ministryQ.params),
-    c.env.DB.prepare("SELECT district AS v, COUNT(*) AS n FROM contracts WHERE district != '' GROUP BY district ORDER BY n DESC LIMIT 70"),
-    c.env.DB.prepare(statusQ.sql).bind(...statusQ.params),
-    c.env.DB.prepare(categoryQ.sql).bind(...categoryQ.params),
-  ]);
-  return c.json({
-    ministries: ministries.results ?? [],
-    districts: districts.results ?? [],
-    statuses: statuses.results ?? [],
-    categories: categories.results ?? [],
-  });
+  const db = c.env.DB;
+  const compute = async () => {
+    const ministryQ = facetQuery(f, "ministry", 60);
+    const statusQ = facetQuery(f, "status");
+    const categoryQ = facetQuery(f, "category");
+    const [ministries, districts, statuses, categories] = await db.batch([
+      db.prepare(ministryQ.sql).bind(...ministryQ.params),
+      db.prepare("SELECT district AS v, COUNT(*) AS n FROM contracts WHERE district != '' GROUP BY district ORDER BY n DESC LIMIT 70"),
+      db.prepare(statusQ.sql).bind(...statusQ.params),
+      db.prepare(categoryQ.sql).bind(...categoryQ.params),
+    ]);
+    return {
+      ministries: ministries.results ?? [],
+      districts: districts.results ?? [],
+      statuses: statuses.results ?? [],
+      categories: categories.results ?? [],
+    };
+  };
+  const key = defaultFiltersKey(f);
+  return c.json(key ? await cachedSummary(db, key, compute) : await compute());
 });
 
 app.get("/api/v1/stats", async (c) => {
-  const r = await c.env.DB.batch([
-    c.env.DB.prepare("SELECT COUNT(*) AS n FROM tenders WHERE status = 'Live'"),
-    c.env.DB.prepare("SELECT COUNT(*) AS n FROM contracts"),
-    c.env.DB.prepare("SELECT COUNT(*) AS n FROM bidders"),
-    c.env.DB.prepare("SELECT MAX(published_at) AS v FROM tenders"),
-    c.env.DB.prepare("SELECT MAX(fetched_at) AS v FROM tenders"),
-  ]);
-  const one = (i: number) => (r[i].results?.[0] as Record<string, unknown> | undefined) ?? {};
-  return c.json({
-    live_tenders: one(0).n ?? 0,
-    contracts: one(1).n ?? 0,
-    bidders: one(2).n ?? 0,
-    newest_published: one(3).v ?? null,
-    last_fetched: one(4).v ?? null,
+  const db = c.env.DB;
+  const body = await cachedSummary(db, "summary:stats", async () => {
+    const r = await db.batch([
+      db.prepare("SELECT COUNT(*) AS n FROM tenders WHERE status = 'Live'"),
+      db.prepare("SELECT COUNT(*) AS n FROM contracts"),
+      db.prepare("SELECT COUNT(*) AS n FROM bidders"),
+      db.prepare("SELECT MAX(published_at) AS v FROM tenders"),
+      db.prepare("SELECT MAX(fetched_at) AS v FROM tenders"),
+    ]);
+    const one = (i: number) => (r[i].results?.[0] as Record<string, unknown> | undefined) ?? {};
+    return {
+      live_tenders: one(0).n ?? 0,
+      contracts: one(1).n ?? 0,
+      bidders: one(2).n ?? 0,
+      newest_published: one(3).v ?? null,
+      last_fetched: one(4).v ?? null,
+    };
   });
+  return c.json(body);
 });
 
 app.get("/api/v1/usage", async (c) => {

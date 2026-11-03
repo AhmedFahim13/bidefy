@@ -39,9 +39,13 @@ export function tenderListQuery(f: TenderFilters): Query {
     where.push("category = ?");
     params.push(f.category);
   }
+  // A status-only list walks the date index and stops at the page. Left to the planner it took the
+  // status index and sorted every live tender (15.7k rows read per page) against D1's daily read cap.
+  const statusOnly = !f.q && !f.ministry && !f.category;
   const sql =
     "SELECT tender_id, reference, status, nature, title, ministry, organization, procuring_entity, pe_id, method, published_at, closing_at, category, category_confidence " +
-    "FROM tenders" + (where.length ? " WHERE " + where.join(" AND ") : "") +
+    "FROM tenders" + (statusOnly ? " INDEXED BY idx_tenders_published" : "") +
+    (where.length ? " WHERE " + where.join(" AND ") : "") +
     " ORDER BY published_at DESC LIMIT ? OFFSET ?";
   params.push(f.size, (f.page - 1) * f.size);
   return { sql, params };

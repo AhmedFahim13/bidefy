@@ -23,6 +23,14 @@ describe("parseTenderFilters", () => {
 });
 
 describe("tenderListQuery", () => {
+  it("walks the date index for a status-only list, so the newest page reads a page of rows", () => {
+    // With only the status index the default list read every live tender (15.7k) and sorted them;
+    // in date order it stops at the page. A free-text or ministry filter keeps the planner's choice.
+    const live = tenderListQuery({ q: "", status: "Live", ministry: "", district: "", category: "", page: 1, size: 25 });
+    expect(live.sql).toContain("FROM tenders INDEXED BY idx_tenders_published");
+    const searched = tenderListQuery({ q: "road", status: "Live", ministry: "", district: "", category: "", page: 1, size: 25 });
+    expect(searched.sql).not.toContain("INDEXED BY");
+  });
   it("builds a parameterised query with filters and paging", () => {
     const { sql, params } = tenderListQuery({ q: "printer", status: "Live", ministry: "Ministry of Finance", district: "", category: "", page: 3, size: 25 });
     expect(sql).toContain("FROM tenders");

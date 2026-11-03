@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertErrorText, matchFilters, notificationFor } from "../src/alerts";
+import { alertErrorText, loadAlreadyMatched, matchFilters, notificationFor } from "../src/alerts";
 
 const t = {
   tender_id: "1",
@@ -48,5 +48,16 @@ describe("alertErrorText", () => {
   it("describes something thrown that is not an Error", () => {
     expect(alertErrorText("boom")).toBe("boom");
     expect(alertErrorText(undefined)).toBe("unknown");
+  });
+});
+
+describe("loadAlreadyMatched", () => {
+  it("skips an hourly run when no load has landed since the last one it matched", () => {
+    // new tenders only reach D1 with a load, about twice a day, and reading every live tender to
+    // learn that nothing changed cost 15.7k rows an hour against a five-million daily allowance
+    expect(loadAlreadyMatched("load-7", "load-7")).toBe(true);
+    expect(loadAlreadyMatched("load-8", "load-7")).toBe(false);
+    expect(loadAlreadyMatched("", "")).toBe(false);          // no marker: cannot tell, so look
+    expect(loadAlreadyMatched("load-7", undefined)).toBe(false);
   });
 });

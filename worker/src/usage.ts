@@ -23,19 +23,31 @@ export const USAGE_SQL: string[] = [
   "SELECT COUNT(*) AS n, MAX(created_at) AS last FROM access_requests",
   "SELECT COUNT(*) AS n, MAX(ran_at) AS last, SUM(candidates) AS seen, SUM(errored) AS errored FROM alert_runs",
   "SELECT SUM(candidates) AS seen FROM alert_runs WHERE ran_at >= ?",
+  "SELECT value FROM meta WHERE key = 'last_alert_error'",
 ];
 
 /** The parameters for USAGE_SQL: the statements that take one all take the same cutoff. */
 export function usageParams(now: Date): (string | number)[][] {
   const ago = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
-  return [[], [ago(30)], [], [ago(7)], [], [], [ago(7)]];
+  return [[], [ago(30)], [], [ago(7)], [], [], [ago(7)], []];
+}
+
+/** The last error an alert run threw, as alerts.ts records it, or null if none or unreadable. */
+function lastError(row: UsageRow | undefined): { at: string; error: string } | null {
+  if (typeof row?.value !== "string") return null;
+  try {
+    const v = JSON.parse(row.value);
+    return typeof v?.at === "string" && typeof v?.error === "string" ? { at: v.at, error: v.error } : null;
+  } catch {
+    return null;
+  }
 }
 
 const int = (v: unknown): number => (typeof v === "number" ? v : Number(v ?? 0)) || 0;
 const iso = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
 
 export function usageSummary(rows: (UsageRow | undefined)[]) {
-  const [subs, subsActive, sent, sent7, access, runs, runs7] = rows;
+  const [subs, subsActive, sent, sent7, access, runs, runs7, failure] = rows;
   const subscribers = int(subs?.n);
   const delivered = int(sent?.n);
   const requests = int(access?.n);
@@ -53,6 +65,7 @@ export function usageSummary(rows: (UsageRow | undefined)[]) {
     // Liveness. Real from the first hour, with or without an audience.
     alert_runs: int(runs?.n),
     alert_runs_that_threw: int(runs?.errored),
+    last_alert_error: lastError(failure),
     last_alert_run_at: iso(runs?.last),
     tenders_examined: int(runs?.seen),
     tenders_examined_in_7_days: int(runs7?.seen),

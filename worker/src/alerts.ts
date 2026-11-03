@@ -81,23 +81,41 @@ export async function runAlerts(env: AlertEnv, opts: { dry: boolean; siteBase: s
   // otherwise an hourly crashloop writes nothing and looks exactly like a cron that never fired.
   // A dry run is a diagnostic and is not recorded.
   let result: RunResult | null = null;
+  let error: string | null = null;
   try {
     result = await matchAndSend(env, opts);
     return result;
+  } catch (e) {
+    error = alertErrorText(e);
+    throw e;
   } finally {
-    if (!opts.dry) await record(env, result);
+    if (!opts.dry) await record(env, result, error);
   }
 }
 
-async function record(env: AlertEnv, r: RunResult | null): Promise<void> {
+/** What a failed run threw, short enough to publish: its kind and message, long numbers masked. */
+export function alertErrorText(e: unknown): string {
+  const text = e instanceof Error ? `${e.name}: ${e.message}` : e === undefined ? "unknown" : String(e);
+  return text.replace(/\d{6,}/g, "#").slice(0, 200);
+}
+
+async function record(env: AlertEnv, r: RunResult | null, error: string | null): Promise<void> {
+  const at = new Date().toISOString();
   try {
     await env.DB.prepare(
       "INSERT OR REPLACE INTO alert_runs (ran_at, candidates, subscriptions, matched, sent, failed, pruned, errored) " +
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
-      .bind(new Date().toISOString(), r?.candidates ?? 0, r?.subscriptions ?? 0, r?.matched ?? 0,
+      .bind(at, r?.candidates ?? 0, r?.subscriptions ?? 0, r?.matched ?? 0,
             r?.sent ?? 0, r?.failed ?? 0, r?.pruned ?? 0, r ? 0 : 1)
       .run();
+    // The count of failed runs says that the cron breaks, not why; the last error says why, and
+    // /api/v1/usage shows it, so a crashloop can be read without access to the Cloudflare logs.
+    if (error) {
+      await env.DB.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('last_alert_error', ?)")
+        .bind(JSON.stringify({ at, error }))
+        .run();
+    }
   } catch {
     // Bookkeeping must never cost an alert. The run happened whether or not it was written down.
   }

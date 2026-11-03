@@ -49,6 +49,16 @@ describe("usageSummary", () => {
     expect(usageSummary([{ n: "7" }, ...Array(6).fill({})]).subscribers).toBe(7);
   });
 
+  it("shows the last error a run threw, so a failing cron can be diagnosed without a dashboard", () => {
+    const rows = [{ n: 0 }, { n: 0 }, { n: 0 }, { n: 0 }, { n: 0 }, { n: 3, errored: 1 }, { seen: 0 },
+                  { value: JSON.stringify({ at: "2026-11-03T06:00:00Z", error: "Error: D1_ERROR: too many SQL variables" }) }];
+    expect(usageSummary(rows).last_alert_error).toEqual(
+      { at: "2026-11-03T06:00:00Z", error: "Error: D1_ERROR: too many SQL variables" });
+    // nothing recorded yet, or a value that is not what the worker writes
+    expect(usageSummary(rows.slice(0, 7)).last_alert_error).toBeNull();
+    expect(usageSummary([...rows.slice(0, 7), { value: "not json" }]).last_alert_error).toBeNull();
+  });
+
   it("never selects a column that identifies a person", () => {
     for (const sql of USAGE_SQL) {
       expect(sql).not.toMatch(/endpoint|keys_json|contact|ip_hash|\bname\b/i);

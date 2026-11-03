@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchFilters, notificationFor } from "../src/alerts";
+import { alertErrorText, matchFilters, notificationFor } from "../src/alerts";
 
 const t = {
   tender_id: "1",
@@ -33,5 +33,20 @@ describe("notificationFor", () => {
     expect(n.body).toContain("Kushtia PBS");
     expect(n.url).toBe("https://bidefy.vercel.app/t/1");
     expect(n.tag).toBe("tender-1");
+  });
+});
+
+describe("alertErrorText", () => {
+  it("keeps the error's kind and message, short, with long numbers masked", () => {
+    const e = new Error("D1_ERROR: no such column: fetched_at for tender 1365277 " + "x".repeat(400));
+    const text = alertErrorText(e);
+    expect(text.startsWith("Error: D1_ERROR: no such column: fetched_at for tender #")).toBe(true);
+    expect(text).not.toContain("1365277");
+    expect(text.length).toBeLessThanOrEqual(200);
+  });
+
+  it("describes something thrown that is not an Error", () => {
+    expect(alertErrorText("boom")).toBe("boom");
+    expect(alertErrorText(undefined)).toBe("unknown");
   });
 });

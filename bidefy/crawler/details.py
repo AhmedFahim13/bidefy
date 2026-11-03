@@ -103,6 +103,8 @@ def _row(tender_id: str, d: dict) -> dict:
         "source_of_funds": d.get("source_of_funds", ""),
         "procuring_entity_district": d.get("procuring_entity_district", ""),
         "method": d.get("method", ""),
+        "app_id": d.get("app_id", ""),
+        "package_no": d.get("package_no", ""),
     }
 
 

@@ -19,6 +19,7 @@ ENDPOINTS = {
         "keyword": "", "pageNo": str(page), "size": str(size)}),
 }
 DETAIL_PATH = "/resources/common/ViewTender.jsp"
+PLAN_SEARCH_PATH = "/SearchServlet"   # behind /resources/common/AdvAPPSearch.jsp
 
 Transport = Callable[[str, str, dict | None, dict], tuple[int, str]]
 
@@ -95,3 +96,13 @@ class EgpSession:
         if not self._warm:
             self.warm_up()
         return self._request("POST", DETAIL_PATH, {"id": str(tender_id), "h": "t"})
+
+    def plan_search(self, app_id: str, package_no: str) -> str:
+        """The public Annual Procurement Plan search, filtered to one plan and package number."""
+        if not self._warm:
+            self.warm_up()
+        return self._request("POST", PLAN_SEARCH_PATH, {
+            "action": "Search", "departmentId": "", "office": "0", "project": "", "financialYear": "",
+            "budgetType": "", "procNature": "", "procType": "", "appId": str(app_id), "appCode": "",
+            "pkgNo": package_no, "operation": "", "value": "0", "value2": "0", "pageNo": "1",
+            "size": "10", "cpvCat": ""})

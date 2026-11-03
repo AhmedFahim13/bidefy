@@ -209,6 +209,17 @@ def _label_map(rows: list[list[str]]) -> dict[str, str]:
     return out
 
 
+def _first_line(rows: list[list[str]], label: str) -> str:
+    """First line of the cell to the right of a 'Label :' cell, e.g. the package number above
+    its description."""
+    for cells in rows:
+        for i in range(len(cells) - 1):
+            if re.sub(r"\s+", " ", cells[i].strip().rstrip(":")).strip() == label:
+                lines = _lines(cells[i + 1])
+                return lines[0] if lines else ""
+    return ""
+
+
 def _to_int(text: str | None) -> int | None:
     digits = re.sub(r"[^\d]", "", text or "")
     return int(digits) if digits else None
@@ -243,6 +254,9 @@ def parse_detail(html: str) -> dict:
         "budget_type": m.get("Budget Type", ""),
         "source_of_funds": m.get("Source of Funds", ""),
         "package": m.get("Tender/Proposal Package No. and Description", ""),
+        # the App ID and package number locate the tender in its Annual Procurement Plan
+        "app_id": re.sub(r"\D", "", m.get("App ID", "")),
+        "package_no": _first_line(p.rows, "Tender/Proposal Package No. and Description"),
         "categories": categories,
         "published_at": parse_datetime(
             m.get("Scheduled Tender/Proposal Publication Date and Time", "")

@@ -124,6 +124,13 @@ def test_parse_detail_fields(detail_html):
     assert isinstance(d["document_price_bdt"], (int, type(None)))
 
 
+def test_parse_detail_plan_reference(detail_html):
+    # the App ID and package number find the tender's line in the Annual Procurement Plan
+    d = parse.parse_detail(detail_html)
+    assert d["app_id"] == "232366"
+    assert d["package_no"] == "TZFaridpur/OfficeEqp/2026-2027"
+
+
 def test_parse_detail_empty():
     d = parse.parse_detail("<html><body>Session Expired</body></html>")
     assert d["tender_id"] == ""

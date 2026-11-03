@@ -1,0 +1,12 @@
+{
+  "endpoint": "plan_estimates",
+  "next_page": 146,
+  "total_pages": 15742,
+  "remaining_live": 15597,
+  "updated_at": "2026-11-03T08:24:07Z",
+  "last_run_status": "budget",
+  "last_run_matched": 142,
+  "last_run_unmatched": 3,
+  "last_run_no_ref": 0,
+  "last_run_failed": 0
+}

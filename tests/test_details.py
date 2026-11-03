@@ -24,6 +24,59 @@ class FakeSession:
         return DETAIL.replace("1333472", tender_id)
 
 
+def _archive_frames():
+    tenders = pl.DataFrame({
+        "tender_id": ["1", "2", "3", "4", "5"],
+        "published_at": ["2015-03-01", "2023-06-01", "2019-01-01", "2024-02-01", None],
+    })
+    # 3 and 5 were awarded; 9 is an award whose notice is missing from the tender index
+    contracts = pl.DataFrame({
+        "tender_id": ["3", "5", "9"],
+        "advertised_at": ["2019-01-01", "2021-05-05", "2022-01-01"],
+    })
+    return tenders, contracts
+
+
+def test_archive_ids_puts_awarded_first_then_newest_first():
+    # 5 has no notice date of its own, so its award's advertised date places it
+    tenders, contracts = _archive_frames()
+    assert details.archive_ids(tenders, contracts, done=set(), n=10) == ["5", "3", "4", "2", "1"]
+
+
+def test_archive_ids_leaves_out_awards_missing_from_the_tender_index():
+    """27 of 30 sampled award-only ids served an empty stub (2026-11-03)."""
+    tenders, contracts = _archive_frames()
+    assert "9" not in details.archive_ids(tenders, contracts, done=set(), n=10)
+
+
+def test_archive_ids_skips_fetched_ids_and_caps_at_n():
+    tenders, contracts = _archive_frames()
+    assert details.archive_ids(tenders, contracts, done={"5", "4"}, n=3) == ["3", "2", "1"]
+
+
+def test_archive_progress_counts_the_tender_index():
+    tenders, contracts = _archive_frames()
+    assert details.archive_progress(tenders, contracts, done={"3", "9", "77"}) == {
+        "indexed": 5, "fetched": 1, "remaining": 4}
+
+
+def test_archive_source_fetches_in_archive_order(tmp_path, monkeypatch):
+    tenders, contracts = _archive_frames()
+    store.append_rows(tenders.to_dicts(), tmp_path, "tenders")
+    store.append_rows(contracts.to_dicts(), tmp_path, "contracts")
+    session = FakeSession()
+    monkeypatch.setattr(details, "EgpSession", lambda min_interval: session)
+    ckpt = tmp_path / "checkpoints" / "details_archive.json"
+    assert details.main(["--data-root", str(tmp_path), "--source", "archive", "--n", "2",
+                         "--checkpoint", str(ckpt)]) == 0
+    assert session.calls == ["5", "3"]
+    # the command centre renders every checkpoint as "next_page - 1 / total_pages"
+    import json
+    c = json.loads(ckpt.read_text(encoding="utf-8"))
+    assert (c["next_page"] - 1, c["total_pages"], c["remaining"]) == (2, 5, 3)
+    assert c["last_run_status"] == "done" and c["updated_at"].endswith("Z")
+
+
 def test_pick_ids_excludes_done_and_is_deterministic():
     ids = [str(i) for i in range(100)]
     a = details.pick_ids(ids, done={"1", "2"}, n=10, seed=7)

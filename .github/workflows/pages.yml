@@ -14,7 +14,7 @@ on:
   # a GITHUB_TOKEN push, so the push trigger above never saw its commits and
   # the page froze at 2026-09-27. Rebuild after every crawl instead.
   workflow_run:
-    workflows: ["Crawl e-GP"]
+    workflows: ["Crawl e-GP", "Details backfill"]
     types: [completed]
   workflow_dispatch:
 

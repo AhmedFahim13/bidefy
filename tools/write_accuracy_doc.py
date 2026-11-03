@@ -119,18 +119,32 @@ def main() -> None:
             "of a cost estimate they do not publish, and awards land near that estimate, so where a "
             "security exists it pins the value far more tightly than history can.")
         add("")
-        add("The two routes are measured on two different windows, and are never averaged into one "
-            "headline. The archive of awards reaches back years, but detail pages have only been "
-            "fetched for roughly the last year, so every published security on record is recent. "
-            "Split the whole archive by date and all of them land after the cut, leaving the "
-            "security multiplier nothing to learn from. So that route is given its own split, at "
-            "eighty percent of the securities by date, fitted on the earlier ones and scored on the "
-            "later ones. Both windows are strictly forward-looking.")
+        weekly = aw.get("security_eval") == "weekly refit"
+        if weekly:
+            add("The two routes are measured on two different windows, and are never averaged into "
+                "one headline. The security route is scored the way it runs: each of the last "
+                f"{aw.get('security_weeks_scored', 0)} weeks is priced by a multiplier refitted every "
+                "week on all earlier securities, as the nightly retrain does, and its band is the "
+                "spread of the previous four weeks' week-ahead misses. Scoring a multiplier frozen "
+                "months before its window measured how a band ages, not what a reader meets: the "
+                "share buyers ask for drifts up, and a fit from May covered 74 percent of October's "
+                "awards. Both windows are strictly forward-looking.")
+            fitted_on = (f"{aw.get('security_fitted_on', 0):,} earlier securities at the first "
+                         "scored week, growing weekly")
+        else:
+            add("The two routes are measured on two different windows, and are never averaged into "
+                "one headline. The archive of awards reaches back years, but detail pages have only "
+                "been fetched for roughly the last year, so every published security on record is "
+                "recent. Split the whole archive by date and all of them land after the cut, leaving "
+                "the security multiplier nothing to learn from. So that route is given its own split, "
+                "at eighty percent of the securities by date, fitted on the earlier ones and scored on "
+                "the later ones. Both windows are strictly forward-looking.")
+            fitted_on = f"{aw.get('security_fitted_on', 0):,} earlier securities"
         add("")
         add("| | From the tender security | From entity history |")
         add("|---|---|---|")
         add(f"| Awards scored | {aw.get('security_n', 0):,} | {aw.get('history_n', 0):,} |")
-        add(f"| Fitted on | {aw.get('security_fitted_on', 0):,} earlier securities | {aw.get('n_fit', 0):,} earlier awards |")
+        add(f"| Fitted on | {fitted_on} | {aw.get('n_fit', 0):,} earlier awards |")
         add(f"| Scored on awards signed from | {aw.get('security_test_from', 'n/a')} | {aw.get('test_from', 'n/a')} |")
         add(f"| Median error of the central estimate | {pct(aw.get('security_mape'))} | {pct(aw.get('history_mape'))} |")
         add(f"| Share of awards inside the band | {pct(aw.get('security_coverage_80'))} | {pct(aw.get('history_coverage_80'))} |")

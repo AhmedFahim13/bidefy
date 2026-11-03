@@ -369,3 +369,32 @@ the model was partly being scored on the rule it had been taught to copy.
 
 **Richer text features and finer security multipliers.** Both were tried, neither moved a number
 outside its noise, and both were reverted rather than kept for the sake of having changed something.
+
+## The security band was scored on a multiplier months older than the one that serves
+
+The route published 74.9 percent coverage against a promise of 80, and a 7.6 percent median error.
+Both came from one split: the multiplier fitted on securities signed before 6 May, the band set on
+May to mid-July, and the score taken on mid-July to October. Coverage fell month by month across
+that window, 82, 80, 75.5, then 74 to 76, while the median award crept further above its implied
+multiple. The share buyers ask for drifts upward, so a multiplier frozen in May was being judged
+on October.
+
+That is not the product. The model retrains every night, so a live tender meets a multiplier at
+most a day old. Scored that way instead, each of the last 25 weeks priced by a multiplier refitted
+on everything before it, with the band set from the previous four weeks' week-ahead misses:
+
+| | One split | Weekly refit |
+|---|---|---|
+| Awards scored | 10,565 | 20,360 |
+| Median error | 7.64 percent | 6.55 percent |
+| Inside the 80 percent band | 74.9 percent | 79.6 percent |
+| Typical band | 1.34x | 1.34x |
+
+Same band width, so the band was never too narrow for what the product does; the score was
+measuring staleness. The served band now comes from the same last four weeks it is scored with,
+rather than from a separate 80/20 split, so the published figure and the served band are the same
+thing. Archives too thin for weekly scoring keep the single split.
+
+A first suspicion, that serving fitted the multiplier on only the awards before the history
+route's cut, was checked and is wrong: no security predates that cut, so serving already falls
+back to every security on record.

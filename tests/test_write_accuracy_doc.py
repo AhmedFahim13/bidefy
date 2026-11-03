@@ -228,6 +228,17 @@ def test_no_stability_file_drops_the_section_rather_than_guessing(render):
     assert "## Award value" in page          # the rest of the page still renders
 
 
+def test_a_weekly_refit_is_described_as_one_and_not_as_a_single_split(render):
+    weekly = {**AWARD, "security_eval": "weekly refit", "security_weeks_scored": 25,
+              "security_fitted_on": 32_168, "security_test_from": "2026-05-11"}
+    page = render({"award_value_model": weekly, "category_classifier": CATEGORY})
+    assert "refitted every week on all earlier securities, as the nightly retrain does" in page
+    assert "| Fitted on | 32,168 earlier securities at the first scored week, growing weekly |" in page
+    assert "eighty percent of the securities by date" not in page
+    split = render({"award_value_model": AWARD, "category_classifier": CATEGORY})
+    assert "eighty percent of the securities by date" in split
+
+
 def test_the_unusable_securities_are_accounted_for(render):
     page = render({"award_value_model": AWARD, "category_classifier": CATEGORY})
     assert "A further 85 published a figure that cannot be true" in page

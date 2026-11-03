@@ -42,6 +42,46 @@ def _synthetic(root: Path, n=900, seed=3, with_security=False):
     pl.DataFrame(live).write_parquet(root / "clean" / "tenders.parquet")
 
 
+def _weekly_securities(weeks=20, per_week=60, drift=0.01, seed=5):
+    """Awards with a published security whose multiple creeps up week by week, as on the portal."""
+    import pandas as pd
+    rng = random.Random(seed)
+    rows = []
+    for w in range(weeks):
+        for k in range(per_week):
+            security = rng.uniform(5_000, 500_000)
+            multiple = 36 * math.exp(drift * w + rng.gauss(0, 0.08))
+            rows.append({"pe_id": f"pe{k % 15}", "method": "OTM", "security_bdt": security,
+                         "lakh": security * multiple / 100_000,
+                         "signed_on": (date(2026, 1, 5) + timedelta(weeks=w, days=k % 5)).isoformat()})
+    return pd.DataFrame(rows).sort_values("signed_on").reset_index(drop=True)
+
+
+def test_weekly_refit_residuals_use_only_earlier_securities():
+    """Each week is priced by a multiplier refitted on the weeks before it, as the nightly retrain
+    does, so a jump in this week's multiple shows in this week's miss instead of being learned."""
+    rows = _weekly_securities(weeks=8, drift=0.0)
+    last = rows["signed_on"] >= (date(2026, 1, 5) + timedelta(weeks=7)).isoformat()
+    rows.loc[last, "lakh"] *= 40 / 36
+    weeks = award._weekly_security(rows, 1)
+    (_, _, _, resid), = weeks
+    assert abs(float(sorted(resid)[len(resid) // 2]) - math.log(40 / 36)) < 0.03
+
+
+def test_security_route_is_scored_the_way_it_is_served():
+    """A multiplier frozen months before its test window under-covers as buyers' multiples drift;
+    the product refits nightly, so the published figure refits weekly and holds its 80 percent."""
+    m = award._evaluate_security_route(_weekly_securities())
+    assert m["security_eval"] == "weekly refit"
+    assert 0.72 <= m["security_coverage_80"] <= 0.88
+    assert m["security_n"] >= 60 * 10
+
+
+def test_thin_archives_keep_the_single_split():
+    m = award._evaluate_security_route(_weekly_securities(weeks=30, per_week=8))
+    assert m["security_eval"] == "single split" and m["security_n"] > 0
+
+
 def test_train_reports_honest_metrics(tmp_path: Path):
     _synthetic(tmp_path)
     m = award.train(tmp_path, tmp_path / "models", seed=0)

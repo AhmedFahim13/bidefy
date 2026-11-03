@@ -58,6 +58,9 @@ SECURITY_IMPLIED_CEILING = 5.0          # an implied award this many times the l
                                         # is a parse error too, and must not reach the screen
 VALUE_STRATA = 5                        # size bands in the published by-value table
 MIN_METHOD_ROWS = 300      # below this a group borrows the shared quantiles
+SECURITY_BAND_WEEKS = 4    # the security band is the spread of the last four weeks' week-ahead misses
+SECURITY_SCORED_WEEKS = 26 # how far back the security route's weekly-refit evaluation reaches
+MIN_WEEK_SECURITIES = 30   # a week thinner than this says too little about the spread to use
 CONFORMAL_GROUPS = ("method",)   # what the band is calibrated separately for
 COVERAGE = 0.80
 BUNDLE_FORMAT = 3          # bump when the saved bundle gains or loses a key
@@ -254,10 +257,40 @@ def _security_band(model: dict, rows: pd.DataFrame) -> tuple[float, float]:
     """
     if rows.empty:
         return 0.0, 0.0
-    ratio = _security_residuals(model, rows)
+    return _band_from_residuals(_security_residuals(model, rows))
+
+
+def _band_from_residuals(ratio: np.ndarray) -> tuple[float, float]:
     n = len(ratio)
+    if n == 0:
+        return 0.0, 0.0
     return (float(np.quantile(ratio, max(0.0, LO_Q * (n + 1) / n))),
             float(np.quantile(ratio, min(1.0, HI_Q * (n + 1) / n))))
+
+
+def _weekly_security(rows: pd.DataFrame, n_weeks: int) -> list[tuple[str, pd.DataFrame, np.ndarray, np.ndarray]]:
+    """The last n_weeks calendar weeks, each priced by a multiplier refitted on every earlier security.
+
+    That is how the route runs: the multiplier retrains every night, so a live tender meets one at
+    most a day old. A multiplier frozen months before its test window measures staleness instead.
+    The share buyers ask for drifts up, so a May fit scored on October covered 74 percent, while
+    the same archive refitted weekly covered 79.6 (2026-11-03). Each entry is the week, its rows,
+    the log centre the earlier fit predicted, and how far each award sat from it. Weeks thinner
+    than MIN_WEEK_SECURITIES are skipped.
+    """
+    week = pd.to_datetime(rows["signed_on"], errors="coerce").dt.to_period("W").astype(str).to_numpy()
+    out = []
+    for w in sorted(set(week))[-n_weeks:]:
+        now = rows[week == w]
+        if len(now) < MIN_WEEK_SECURITIES:
+            continue
+        model = _fit_security(rows[week < w])
+        if model is None:
+            continue
+        sec_lakh = pd.to_numeric(now["security_bdt"], errors="coerce").to_numpy() / TAKA_PER_LAKH
+        centre = np.log(sec_lakh) + _security_log_multiple(model, now["method"].to_numpy(), now["pe_id"].to_numpy())
+        out.append((w, now, centre, np.log(now["lakh"].to_numpy()) - centre))
+    return out
 
 
 def _security_log_multiple(model: dict, methods: np.ndarray, entities: np.ndarray | None = None) -> np.ndarray:
@@ -459,6 +492,18 @@ def _calibrate_cqr(past: pd.DataFrame, levels: dict, calib: pd.DataFrame,
             "drift_pad": round(drift, 3)}
 
 
+def _security_scores(actual: np.ndarray, q50: np.ndarray, q10: np.ndarray, q90: np.ndarray) -> dict:
+    ok = np.isfinite(q50) & (actual > 0)
+    inside = (actual >= q10) & (actual <= q90)
+    return {
+        "security_n": int(ok.sum()),
+        "security_mape": round(float(np.median(np.abs(q50[ok] - actual[ok]) / actual[ok])), 4),
+        "security_coverage_80": round(float(inside[ok].mean()), 4),
+        "security_band_width_median": round(float(np.median(q90[ok] / np.maximum(q10[ok], 1e-9))), 2),
+        "security_by_value": _by_value(actual[ok], q50[ok], q10[ok], q90[ok]),
+    }
+
+
 def _evaluate_security_route(pdf: pd.DataFrame) -> dict:
     """Score the security route on its own timeline, fitted on earlier securities only.
 
@@ -477,6 +522,26 @@ def _evaluate_security_route(pdf: pd.DataFrame) -> dict:
     out = {"security_route_n_total": int(len(rows)), "security_rows_implausible": implausible}
     if len(rows) < 2 * MIN_SECURITY_ROWS:
         return out
+    # Scored the way it is served: each week priced by a multiplier refitted on everything before
+    # it, with the band set from the previous SECURITY_BAND_WEEKS weeks' week-ahead misses.
+    weeks = _weekly_security(rows, SECURITY_SCORED_WEEKS + SECURITY_BAND_WEEKS)
+    if len(weeks) >= SECURITY_BAND_WEEKS + 4:
+        parts = []
+        for i in range(SECURITY_BAND_WEEKS, len(weeks)):
+            lo, hi = _band_from_residuals(np.concatenate([r for *_, r in weeks[i - SECURITY_BAND_WEEKS:i]]))
+            _, now, centre, _ = weeks[i]
+            parts.append((now["lakh"].to_numpy(), np.exp(centre), np.exp(centre + lo), np.exp(centre + hi)))
+        actual, q50, q10, q90 = (np.concatenate(x) for x in zip(*parts, strict=True))
+        first = str(weeks[SECURITY_BAND_WEEKS][1]["signed_on"].min())
+        out.update(_security_scores(actual, q50, q10, q90))
+        out.update({
+            "security_eval": "weekly refit",
+            "security_test_from": first,
+            "security_fitted_on": int((rows["signed_on"].astype(str) < first).sum()),
+            "security_calibrated_on": int(sum(len(r) for *_, r in weeks[-SECURITY_BAND_WEEKS:])),
+            "security_weeks_scored": len(weeks) - SECURITY_BAND_WEEKS,
+        })
+        return out
     signed = rows["signed_on"].astype(str)
     fit_cut = str(rows["signed_on"].iloc[int(len(rows) * 0.60)])
     cut = str(rows["signed_on"].iloc[int(len(rows) * 0.80)])
@@ -493,15 +558,12 @@ def _evaluate_security_route(pdf: pd.DataFrame) -> dict:
     actual = later["lakh"].to_numpy()
     ok = np.isfinite(q50) & (actual > 0)
     inside = (actual >= q10) & (actual <= q90)
+    out.update(_security_scores(actual, q50, q10, q90))
     out.update({
-        "security_n": int(ok.sum()),
+        "security_eval": "single split",
         "security_fitted_on": int(len(earlier)),
         "security_calibrated_on": int(len(calib)),
         "security_test_from": cut,
-        "security_mape": round(float(np.median(np.abs(q50[ok] - actual[ok]) / actual[ok])), 4),
-        "security_coverage_80": round(float(inside[ok].mean()), 4),
-        "security_band_width_median": round(float(np.median(q90[ok] / np.maximum(q10[ok], 1e-9))), 2),
-        "security_by_value": _by_value(actual[ok], q50[ok], q10[ok], q90[ok]),
     })
     # A band ages. The share buyers ask for drifts, and the spread of awards around it has widened
     # month by month, so a band set in June covers June better than September. The model retrains
@@ -635,7 +697,13 @@ def train(data_root: Path, models_dir: Path, seed: int = 0) -> dict | None:
     with_sec = with_sec[_plausible_security(with_sec)].sort_values("signed_on")
     sec_model = _fit_security(with_sec)
     sec_lo = sec_hi = 0.0
-    if sec_model and len(with_sec) >= 2 * MIN_SECURITY_ROWS:
+    # the week in progress is often too thin to count, so look two weeks further back
+    recent = _weekly_security(with_sec, SECURITY_BAND_WEEKS + 2)[-SECURITY_BAND_WEEKS:] if sec_model else []
+    if len(recent) == SECURITY_BAND_WEEKS:
+        # the same band the published figures are scored with: the last four weeks' misses, each
+        # against a multiplier refitted on everything before its week
+        sec_lo, sec_hi = _band_from_residuals(np.concatenate([r for *_, r in recent]))
+    elif sec_model and len(with_sec) >= 2 * MIN_SECURITY_ROWS:
         signed = with_sec["signed_on"].astype(str)
         fit_cut = str(with_sec["signed_on"].iloc[int(len(with_sec) * 0.80)])
         weaker = _fit_security(with_sec[signed < fit_cut])

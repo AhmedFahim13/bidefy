@@ -10,6 +10,12 @@ on:
       - docs/product/**
       - tools/build_site.py
       - .github/workflows/pages.yml
+  # The crawler commits with GITHUB_TOKEN, and GitHub starts no workflow from
+  # a GITHUB_TOKEN push, so the push trigger above never saw its commits and
+  # the page froze at 2026-09-27. Rebuild after every crawl instead.
+  workflow_run:
+    workflows: ["Crawl e-GP"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:

@@ -97,8 +97,9 @@ jobs:
           uv run python -m bidefy.models.classifier train
           uv run python -m bidefy.normalize.build
           uv run python -m bidefy.models.award train
-          # forward-tests the plan-estimate route and opens its gate only on the fixed rule
-          uv run python -m bidefy.models.plan_route train
+          # forward-tests the plan-estimate route and opens its gate only on the fixed rule; a failure
+          # here must not cost the crawl its data, so it only leaves the route as it was
+          uv run python -m bidefy.models.plan_route train || echo "plan route not updated this run"
           uv run python -m bidefy.models.award apply
           uv run python tools/metrics_stability.py
           uv run python tools/write_accuracy_doc.py

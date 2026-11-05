@@ -91,3 +91,12 @@ def test_movement_is_judged_by_direction_not_by_size():
     assert w._direction(up) == "better" and w._direction(down) == "worse"
     assert w._direction({"typical_step": 0.01, "net_change": 0.02, "better": "up"}) == "noise"
     assert w._direction({"typical_step": 0.0, "net_change": 0.5, "better": "up"}) == "noise"
+
+
+def test_the_plan_route_card_says_whether_it_is_serving():
+    p = build_site.compute_progress(STATUS)
+    metrics = {"plan_route": {"mape": 0.041, "coverage_80": 0.8, "n_test": 12,
+                              "gate": "12 of 200 awards scored so far"}}
+    html = build_site.render_dashboard(STATUS, p, crawl={}, metrics=metrics)
+    assert "from the procurement plan (forward test)" in html
+    assert "12 of 200 awards scored so far" in html

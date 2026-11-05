@@ -68,22 +68,24 @@ export default async function TenderPage({ params }: Props) {
           <p className="eyebrow">Predicted award band</p>
           {data.prediction && !data.prediction.deferred ? (
             <div className="mt-2">
-              <span className={`inline-block rounded-sm px-2 py-0.5 font-mono text-[0.66rem] uppercase tracking-[0.12em] ${data.prediction.basis === "security" ? "bg-ok-wash text-ok" : "bg-surface-2 text-ink-2"}`}>
-                {data.prediction.basis === "security" ? "from tender security" : "from entity history"}
+              <span className={`inline-block rounded-sm px-2 py-0.5 font-mono text-[0.66rem] uppercase tracking-[0.12em] ${data.prediction.basis === "security" || data.prediction.basis === "plan" ? "bg-ok-wash text-ok" : "bg-surface-2 text-ink-2"}`}>
+                {data.prediction.basis === "plan" ? "from procurement plan" : data.prediction.basis === "security" ? "from tender security" : "from entity history"}
               </span>
               <p className="num mt-1 text-2xl font-medium">{formatLakh(data.prediction.q10_lakh)} to {formatLakh(data.prediction.q90_lakh)}</p>
               <p className="mt-1 text-sm text-ink-2">Most likely near <span className="num">{formatLakh(data.prediction.q50_lakh)}</span>.</p>
               <p className="mt-2 text-xs text-ink-3">
-                {data.prediction.basis === "security"
-                  ? "Derived from the refundable tender security in this notice. Buyers set it as a fixed share of their own cost estimate, so it pins the likely award closely. On held-out awards this route lands within 8 percent of the real value and its band holds about 85 percent of the time."
-                  : "Derived from this entity's award history with the ministry, method, category and the wording of the title. No security is published for this tender, so the band is wider. On held-out awards bands like this one hold about three times in four."}
+                {data.prediction.basis === "plan"
+                  ? "Derived from the buyer's own cost estimate for this package in its Annual Procurement Plan, published before the tender. This route only serves after a forward test, on awards whose estimate was read before they were signed, showed it beating the security route with an honest band."
+                  : data.prediction.basis === "security"
+                  ? "Derived from the refundable tender security in this notice. Buyers set it as a fixed share of their own cost estimate, so it pins the likely award closely. On awards it had not seen, the middle figure lands within about 7 percent of the real value and the band holds about four times in five."
+                  : "Derived from this entity's award history with the ministry, method, category and the wording of the title. No security is published for this tender, so the band is wider. On awards it had not seen, bands like this one hold about four times in five."}
                 {" "}Model {data.prediction.model_version}.
               </p>
             </div>
           ) : data.prediction ? (
             <p className="mt-2 text-sm text-ink-3">No band for this tender. The entity has too little award history, or the band would be too wide to be useful. Bidefy declines rather than guesses.</p>
           ) : (
-            <p className="mt-2 text-sm text-ink-3">No band yet. Bands appear for live tenders once the award model has run against this entity's history.</p>
+            <p className="mt-2 text-sm text-ink-3">No band yet. Bands appear for live tenders once the award model has run against this entity&apos;s history.</p>
           )}
         </div>
         <div className="mt-8 border-t-2 border-ink pt-3">

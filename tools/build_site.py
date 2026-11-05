@@ -97,6 +97,11 @@ HEADLINE = (
         ("history_coverage_80", "inside the band", _pct),
         ("history_band_width_median", "typical band", _x),
         ("deferral_rate", "declined overall", _pct))),
+    ("plan_route", "Award, from the procurement plan (forward test)", (
+        ("mape", "median error", _pct),
+        ("coverage_80", "inside the band", _pct),
+        ("n_test", "awards scored", lambda v: f"{v:,}" if v is not None else "n/a"),
+        ("gate", "serving", lambda v: v or "n/a"))),
     ("category_classifier", "Category", (
         ("accuracy_acted", "accuracy on what it answers", _pct),
         ("deferral_rate", "declined", _pct),

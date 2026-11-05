@@ -41,7 +41,7 @@ from sklearn.linear_model import Ridge
 from sklearn.model_selection import KFold
 
 from ..crawler import store
-from . import gate
+from . import gate, plan_route
 
 CAT_COLS = ["pe_id", "ministry", "method", "district", "category"]
 PARAMS = dict(n_estimators=600, learning_rate=0.05, num_leaves=63, min_child_samples=20,
@@ -1033,6 +1033,9 @@ def apply(data_root: Path, models_dir: Path) -> int:
             tenders = tenders.with_columns(pl.lit("").alias(col))
     tenders = _join_security(tenders, Path(data_root))
     preds = predict(tenders, bundle)
+    # the plan-estimate route reprices what it can, once its forward test has opened the gate
+    preds = plan_route.overlay(preds, store.load_all(Path(data_root), plan_route.ENDPOINT),
+                               plan_route.load(Path(models_dir)))
     out = Path(data_root) / "clean" / "predictions.parquet"
     tmp = out.with_suffix(".parquet.tmp")
     preds.write_parquet(tmp, compression="zstd")

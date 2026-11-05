@@ -8,14 +8,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7957,
-      "last": 0.8069,
+      "first": 0.8004,
+      "last": 0.8099,
       "min": 0.7927,
-      "max": 0.8069,
-      "spread": 0.0142,
+      "max": 0.8099,
+      "spread": 0.0172,
       "typical_step": 0.0026,
       "largest_step": 0.0142,
-      "net_change": 0.0112
+      "net_change": 0.0095
     },
     "award_value_model.history_coverage_80": {
       "label": "Coverage, history route",
@@ -23,14 +23,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7795,
-      "last": 0.7861,
-      "min": 0.7795,
-      "max": 0.7902,
-      "spread": 0.0107,
+      "first": 0.786,
+      "last": 0.7903,
+      "min": 0.783,
+      "max": 0.7903,
+      "spread": 0.0073,
       "typical_step": 0.0029,
       "largest_step": 0.0072,
-      "net_change": 0.0066
+      "net_change": 0.0043
     },
     "award_value_model.history_mape": {
       "label": "Median error, history route",
@@ -38,14 +38,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.3714,
-      "last": 0.3661,
-      "min": 0.3661,
+      "first": 0.375,
+      "last": 0.3641,
+      "min": 0.3641,
       "max": 0.3757,
-      "spread": 0.0096,
+      "spread": 0.0116,
       "typical_step": 0.0012,
       "largest_step": 0.0054,
-      "net_change": -0.0053
+      "net_change": -0.0109
     },
     "award_value_model.history_band_width_median": {
       "label": "Band width, history route",
@@ -53,14 +53,14 @@
       "kind": "multiple",
       "better": "down",
       "runs": 14,
-      "first": 4.83,
-      "last": 4.78,
+      "first": 4.96,
+      "last": 4.82,
       "min": 4.75,
       "max": 5.04,
       "spread": 0.29,
-      "typical_step": 0.05,
+      "typical_step": 0.04,
       "largest_step": 0.25,
-      "net_change": -0.05
+      "net_change": -0.14
     },
     "award_value_model.security_coverage_80": {
       "label": "Coverage, security route",
@@ -68,14 +68,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7477,
-      "last": 0.7966,
+      "first": 0.7471,
+      "last": 0.7968,
       "min": 0.7468,
       "max": 0.7972,
       "spread": 0.0504,
-      "typical_step": 0.0003,
+      "typical_step": 0.0002,
       "largest_step": 0.046,
-      "net_change": 0.0489
+      "net_change": 0.0497
     },
     "award_value_model.security_mape": {
       "label": "Median error, security route",
@@ -83,14 +83,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.0759,
+      "first": 0.0763,
       "last": 0.0671,
       "min": 0.0656,
       "max": 0.0765,
       "spread": 0.0109,
       "typical_step": 0.0,
       "largest_step": 0.0108,
-      "net_change": -0.0088
+      "net_change": -0.0092
     },
     "award_value_model.deferral_rate": {
       "label": "Award deferral",
@@ -98,14 +98,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.1097,
-      "last": 0.0728,
+      "first": 0.0885,
+      "last": 0.0747,
       "min": 0.0728,
-      "max": 0.1097,
-      "spread": 0.0369,
+      "max": 0.0935,
+      "spread": 0.0207,
       "typical_step": 0.0028,
-      "largest_step": 0.0212,
-      "net_change": -0.0369
+      "largest_step": 0.0094,
+      "net_change": -0.0138
     },
     "category_classifier.accuracy_acted": {
       "label": "Category accuracy",
@@ -128,14 +128,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.1188,
-      "last": 0.1112,
-      "min": 0.1112,
+      "first": 0.1189,
+      "last": 0.1094,
+      "min": 0.1094,
       "max": 0.1206,
-      "spread": 0.0094,
-      "typical_step": 0.0004,
+      "spread": 0.0112,
+      "typical_step": 0.0005,
       "largest_step": 0.0043,
-      "net_change": -0.0076
+      "net_change": -0.0095
     },
     "category_classifier.macro_f1": {
       "label": "Category macro F1",
@@ -143,16 +143,16 @@
       "kind": "score",
       "better": "up",
       "runs": 14,
-      "first": 0.7332,
-      "last": 0.7362,
+      "first": 0.7326,
+      "last": 0.7357,
       "min": 0.7304,
       "max": 0.7362,
       "spread": 0.0058,
       "typical_step": 0.0012,
       "largest_step": 0.0035,
-      "net_change": 0.003
+      "net_change": 0.0031
     }
   },
-  "from": "2026-10-28T16:06:46Z",
-  "to": "2026-11-04T17:25:28Z"
+  "from": "2026-10-29T15:54:37Z",
+  "to": "2026-11-05T01:53:09Z"
 }

@@ -1,12 +1,12 @@
 {
   "endpoint": "plan_estimates",
-  "next_page": 4962,
-  "total_pages": 16433,
-  "remaining_live": 11472,
-  "updated_at": "2026-11-05T18:25:59Z",
-  "last_run_status": "aborted",
-  "last_run_matched": 837,
-  "last_run_unmatched": 15,
-  "last_run_no_ref": 3,
-  "last_run_failed": 7
+  "next_page": 6328,
+  "total_pages": 16875,
+  "remaining_live": 10548,
+  "updated_at": "2026-11-06T03:01:06Z",
+  "last_run_status": "budget",
+  "last_run_matched": 1326,
+  "last_run_unmatched": 28,
+  "last_run_no_ref": 12,
+  "last_run_failed": 2
 }

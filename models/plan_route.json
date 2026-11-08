@@ -1,7 +1,12 @@
 {
-  "pooled": null,
+  "pooled": {
+    "n": 20,
+    "centre": -0.15993048540800806,
+    "lo": -0.8329339223593457,
+    "hi": -0.01580403017556589
+  },
   "by_method": {},
   "active": false,
-  "reason": "0 of 200 awards scored so far",
+  "reason": "10 of 200 awards scored so far",
   "version": "plan-20261108"
 }

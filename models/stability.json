@@ -129,13 +129,13 @@
       "better": "down",
       "runs": 14,
       "first": 0.1188,
-      "last": 0.0589,
-      "min": 0.0589,
+      "last": 0.0575,
+      "min": 0.0575,
       "max": 0.1192,
-      "spread": 0.0603,
+      "spread": 0.0617,
       "typical_step": 0.0037,
       "largest_step": 0.0182,
-      "net_change": -0.0599
+      "net_change": -0.0613
     },
     "category_classifier.macro_f1": {
       "label": "Category macro F1",
@@ -144,13 +144,13 @@
       "better": "up",
       "runs": 14,
       "first": 0.7304,
-      "last": 0.7492,
+      "last": 0.7479,
       "min": 0.7304,
-      "max": 0.7492,
-      "spread": 0.0188,
+      "max": 0.7479,
+      "spread": 0.0175,
       "typical_step": 0.0023,
-      "largest_step": 0.0059,
-      "net_change": 0.0188
+      "largest_step": 0.0046,
+      "net_change": 0.0175
     }
   },
   "from": "2026-11-02T00:36:41Z",

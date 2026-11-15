@@ -1,11 +1,11 @@
 {
   "endpoint": "details_archive",
-  "next_page": 270536,
+  "next_page": 272641,
   "total_pages": 641065,
-  "remaining": 370530,
-  "updated_at": "2026-11-15T04:47:37Z",
+  "remaining": 368425,
+  "updated_at": "2026-11-15T16:08:04Z",
   "last_run_status": "aborted",
-  "last_run_fetched": 9484,
+  "last_run_fetched": 2105,
   "last_run_empty": 0,
-  "last_run_failed": 10
+  "last_run_failed": 7
 }

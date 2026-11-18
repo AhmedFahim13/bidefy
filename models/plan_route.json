@@ -1,19 +1,19 @@
 {
   "pooled": {
-    "n": 818,
-    "centre": -0.08785384362698201,
-    "lo": -0.24351650300557667,
-    "hi": -0.000721327472517836
+    "n": 993,
+    "centre": -0.08614595071320094,
+    "lo": -0.22828359879256546,
+    "hi": 0.0
   },
   "by_method": {
     "OTM": {
-      "n": 815,
-      "centre": -0.08796877294595729,
-      "lo": -0.24377171395248445,
-      "hi": -0.000911546451928905
+      "n": 990,
+      "centre": -0.08636787063160696,
+      "lo": -0.22941351665841309,
+      "hi": 0.0
     }
   },
   "active": true,
-  "reason": "beats the security route (6.1% against 7.5%) with an honest band",
+  "reason": "beats the security route (5.8% against 7.5%) with an honest band",
   "version": "plan-20261118"
 }

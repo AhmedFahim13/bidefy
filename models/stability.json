@@ -129,13 +129,13 @@
       "better": "down",
       "runs": 14,
       "first": 0.0854,
-      "last": 0.0337,
-      "min": 0.0337,
+      "last": 0.0322,
+      "min": 0.0322,
       "max": 0.0854,
-      "spread": 0.0517,
+      "spread": 0.0532,
       "typical_step": 0.0018,
       "largest_step": 0.0182,
-      "net_change": -0.0517
+      "net_change": -0.0532
     },
     "category_classifier.macro_f1": {
       "label": "Category macro F1",

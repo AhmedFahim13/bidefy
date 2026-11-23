@@ -8,14 +8,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.799,
-      "last": 0.7881,
+      "first": 0.7972,
+      "last": 0.7887,
       "min": 0.785,
-      "max": 0.799,
-      "spread": 0.014,
+      "max": 0.7972,
+      "spread": 0.0122,
       "typical_step": 0.0027,
       "largest_step": 0.0068,
-      "net_change": -0.0109
+      "net_change": -0.0085
     },
     "award_value_model.history_coverage_80": {
       "label": "Coverage, history route",
@@ -23,14 +23,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7951,
-      "last": 0.7891,
+      "first": 0.7934,
+      "last": 0.7905,
       "min": 0.7799,
-      "max": 0.7951,
-      "spread": 0.0152,
+      "max": 0.7934,
+      "spread": 0.0135,
       "typical_step": 0.0042,
       "largest_step": 0.0105,
-      "net_change": -0.006
+      "net_change": -0.0029
     },
     "award_value_model.history_mape": {
       "label": "Median error, history route",
@@ -38,8 +38,8 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.3657,
-      "last": 0.369,
+      "first": 0.3656,
+      "last": 0.3689,
       "min": 0.3656,
       "max": 0.37,
       "spread": 0.0044,
@@ -53,14 +53,14 @@
       "kind": "multiple",
       "better": "down",
       "runs": 14,
-      "first": 4.93,
-      "last": 4.94,
+      "first": 4.91,
+      "last": 4.96,
       "min": 4.72,
-      "max": 4.94,
-      "spread": 0.22,
+      "max": 4.96,
+      "spread": 0.24,
       "typical_step": 0.03,
       "largest_step": 0.17,
-      "net_change": 0.01
+      "net_change": 0.05
     },
     "award_value_model.security_coverage_80": {
       "label": "Coverage, security route",
@@ -68,14 +68,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7963,
+      "first": 0.7962,
       "last": 0.7938,
       "min": 0.7934,
       "max": 0.7968,
       "spread": 0.0034,
       "typical_step": 0.0002,
       "largest_step": 0.0024,
-      "net_change": -0.0025
+      "net_change": -0.0024
     },
     "award_value_model.security_mape": {
       "label": "Median error, security route",
@@ -83,14 +83,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.074,
+      "first": 0.0748,
       "last": 0.0779,
-      "min": 0.074,
+      "min": 0.0748,
       "max": 0.0779,
-      "spread": 0.0039,
+      "spread": 0.0031,
       "typical_step": 0.0001,
       "largest_step": 0.0019,
-      "net_change": 0.0039
+      "net_change": 0.0031
     },
     "award_value_model.deferral_rate": {
       "label": "Award deferral",
@@ -98,14 +98,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.0719,
-      "last": 0.0663,
+      "first": 0.0728,
+      "last": 0.0664,
       "min": 0.0626,
       "max": 0.0728,
       "spread": 0.0102,
       "typical_step": 0.0022,
       "largest_step": 0.0072,
-      "net_change": -0.0056
+      "net_change": -0.0064
     },
     "category_classifier.accuracy_acted": {
       "label": "Category accuracy",
@@ -128,14 +128,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.0501,
-      "last": 0.023,
-      "min": 0.023,
-      "max": 0.0501,
-      "spread": 0.0271,
-      "typical_step": 0.001,
+      "first": 0.045,
+      "last": 0.0226,
+      "min": 0.0226,
+      "max": 0.045,
+      "spread": 0.0224,
+      "typical_step": 0.0009,
       "largest_step": 0.0113,
-      "net_change": -0.0271
+      "net_change": -0.0224
     },
     "category_classifier.macro_f1": {
       "label": "Category macro F1",
@@ -143,16 +143,16 @@
       "kind": "score",
       "better": "up",
       "runs": 14,
-      "first": 0.7476,
-      "last": 0.758,
-      "min": 0.7476,
+      "first": 0.751,
+      "last": 0.7586,
+      "min": 0.751,
       "max": 0.7589,
-      "spread": 0.0113,
+      "spread": 0.0079,
       "typical_step": 0.0005,
       "largest_step": 0.0053,
-      "net_change": 0.0104
+      "net_change": 0.0076
     }
   },
-  "from": "2026-11-11T18:30:16Z",
-  "to": "2026-11-22T18:27:05Z"
+  "from": "2026-11-12T18:07:55Z",
+  "to": "2026-11-23T04:06:09Z"
 }

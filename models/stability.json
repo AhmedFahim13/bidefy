@@ -8,14 +8,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7961,
-      "last": 0.7887,
+      "first": 0.7893,
+      "last": 0.786,
       "min": 0.785,
-      "max": 0.7961,
-      "spread": 0.0111,
+      "max": 0.7928,
+      "spread": 0.0078,
       "typical_step": 0.0027,
-      "largest_step": 0.0068,
-      "net_change": -0.0074
+      "largest_step": 0.0052,
+      "net_change": -0.0033
     },
     "award_value_model.history_coverage_80": {
       "label": "Coverage, history route",
@@ -23,14 +23,14 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7933,
-      "last": 0.7926,
+      "first": 0.7828,
+      "last": 0.7881,
       "min": 0.7799,
-      "max": 0.7933,
-      "spread": 0.0134,
+      "max": 0.7926,
+      "spread": 0.0127,
       "typical_step": 0.0042,
-      "largest_step": 0.0105,
-      "net_change": -0.0007
+      "largest_step": 0.0091,
+      "net_change": 0.0053
     },
     "award_value_model.history_mape": {
       "label": "Median error, history route",
@@ -38,14 +38,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.3667,
-      "last": 0.3679,
+      "first": 0.3663,
+      "last": 0.3692,
       "min": 0.3656,
       "max": 0.37,
       "spread": 0.0044,
-      "typical_step": 0.0008,
+      "typical_step": 0.001,
       "largest_step": 0.003,
-      "net_change": 0.0012
+      "net_change": 0.0029
     },
     "award_value_model.history_band_width_median": {
       "label": "Band width, history route",
@@ -53,14 +53,14 @@
       "kind": "multiple",
       "better": "down",
       "runs": 14,
-      "first": 4.92,
-      "last": 4.98,
+      "first": 4.75,
+      "last": 4.94,
       "min": 4.72,
       "max": 4.98,
       "spread": 0.26,
       "typical_step": 0.03,
-      "largest_step": 0.17,
-      "net_change": 0.06
+      "largest_step": 0.15,
+      "net_change": 0.19
     },
     "award_value_model.security_coverage_80": {
       "label": "Coverage, security route",
@@ -68,8 +68,8 @@
       "kind": "pct",
       "better": "up",
       "runs": 14,
-      "first": 0.7964,
-      "last": 0.7944,
+      "first": 0.7966,
+      "last": 0.7946,
       "min": 0.7934,
       "max": 0.7968,
       "spread": 0.0034,
@@ -83,14 +83,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.0748,
+      "first": 0.0749,
       "last": 0.0778,
-      "min": 0.0748,
+      "min": 0.0749,
       "max": 0.0779,
-      "spread": 0.0031,
+      "spread": 0.003,
       "typical_step": 0.0001,
       "largest_step": 0.0019,
-      "net_change": 0.003
+      "net_change": 0.0029
     },
     "award_value_model.deferral_rate": {
       "label": "Award deferral",
@@ -98,14 +98,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.0692,
-      "last": 0.0704,
+      "first": 0.0718,
+      "last": 0.0653,
       "min": 0.0626,
       "max": 0.0718,
       "spread": 0.0092,
       "typical_step": 0.0022,
       "largest_step": 0.0072,
-      "net_change": 0.0012
+      "net_change": -0.0065
     },
     "category_classifier.accuracy_acted": {
       "label": "Category accuracy",
@@ -128,14 +128,14 @@
       "kind": "pct",
       "better": "down",
       "runs": 14,
-      "first": 0.0436,
+      "first": 0.0432,
       "last": 0.0224,
       "min": 0.0224,
-      "max": 0.0436,
-      "spread": 0.0212,
+      "max": 0.0432,
+      "spread": 0.0208,
       "typical_step": 0.0009,
       "largest_step": 0.0113,
-      "net_change": -0.0212
+      "net_change": -0.0208
     },
     "category_classifier.macro_f1": {
       "label": "Category macro F1",
@@ -143,16 +143,16 @@
       "kind": "score",
       "better": "up",
       "runs": 14,
-      "first": 0.7534,
-      "last": 0.758,
+      "first": 0.7532,
+      "last": 0.7581,
       "min": 0.7526,
       "max": 0.7589,
       "spread": 0.0063,
       "typical_step": 0.0005,
       "largest_step": 0.0053,
-      "net_change": 0.0046
+      "net_change": 0.0049
     }
   },
-  "from": "2026-11-13T04:00:45Z",
-  "to": "2026-11-23T23:35:24Z"
+  "from": "2026-11-13T17:59:15Z",
+  "to": "2026-11-24T08:15:18Z"
 }

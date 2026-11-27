@@ -1,12 +1,12 @@
 {
   "endpoint": "tenders",
   "next_page": 3135,
-  "total_pages": 3227,
-  "newest_id_seen": "1382030",
+  "total_pages": 3229,
+  "newest_id_seen": "1383018",
   "mode": "delta",
-  "updated_at": "2026-11-26T02:39:33Z",
+  "updated_at": "2026-11-27T02:40:04Z",
   "last_run_pages": 4,
-  "last_run_rows": 401,
+  "last_run_rows": 422,
   "last_run_status": "done",
   "backfill_completed": true
 }

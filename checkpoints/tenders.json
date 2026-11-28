@@ -4,9 +4,9 @@
   "total_pages": 3229,
   "newest_id_seen": "1383018",
   "mode": "delta",
-  "updated_at": "2026-11-27T02:40:04Z",
-  "last_run_pages": 4,
-  "last_run_rows": 422,
+  "updated_at": "2026-11-28T02:28:59Z",
+  "last_run_pages": 1,
+  "last_run_rows": 0,
   "last_run_status": "done",
   "backfill_completed": true
 }
